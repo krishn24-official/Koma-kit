@@ -1,5 +1,7 @@
-import { useState, type DragEvent } from 'react';
+import { useState, type DragEvent, type PointerEvent } from 'react';
 import { useMediaUpload } from '@/hooks/useMediaUpload';
+import { useEditorStore } from '@/store/useEditorStore';
+import { useUiStore } from '@/store/useUiStore';
 import { cn } from '@/utils/cn';
 import { TemplateCanvas } from './TemplateCanvas';
 
@@ -20,6 +22,15 @@ export function Workspace() {
     void uploadMany(Array.from(e.dataTransfer.files));
   };
 
+  /** Tapping empty space around the canvas closes the phone panel and deselects. */
+  const handlePointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest('[data-canvas-area]')) return;
+    const ui = useUiStore.getState();
+    if (ui.cropRect || ui.stickerCrop) return; // keep the crop open until Apply/Cancel
+    ui.closeMobilePanel();
+    useEditorStore.getState().clearSelection();
+  };
+
   return (
     <div
       className={cn(
@@ -35,6 +46,7 @@ export function Workspace() {
         if (e.currentTarget === e.target) setIsDragOver(false);
       }}
       onDrop={handleDrop}
+      onPointerDown={handlePointerDown}
     >
       <TemplateCanvas />
     </div>
