@@ -1,13 +1,22 @@
 import { create } from 'zustand';
 import { DEFAULT_ASPECT_RATIO_ID } from '@/constants/aspectRatios';
 import { createDefaultText, DEFAULT_EXPORT_OPTIONS, DEFAULT_STYLE } from '@/constants/editor';
-import { DEFAULT_LAYOUT_ID, getLayout } from '@/constants/layouts';
+import { DEFAULT_LAYOUT_ID, getPreset, MAX_CELLS } from '@/constants/layouts';
+import {
+  addLayer as addLayerToTree,
+  addStrip,
+  countCells,
+  equalizeLayout as equalizeTree,
+  removeCell,
+  resizeDivider as resizeTreeDivider,
+} from '@/utils/layoutTree';
 import type {
   AspectRatioId,
   CanvasStyle,
   CellMedia,
   ExportOptions,
   ImageTransform,
+  LayoutNode,
   Selection,
   TextOverlay,
 } from '@/types';
@@ -20,7 +29,10 @@ const SAME_TIME = 0.01;
 const MIN_CLIP_LENGTH = 0.1;
 
 export interface EditorState {
-  layoutId: string;
+  /** The layout tree: how the canvas is split into boxes (see LayoutNode). */
+  layoutRoot: LayoutNode;
+  /** Preset the layout came from; null once boxes are added, removed or resized. */
+  presetId: string | null;
   aspectRatioId: AspectRatioId;
   style: CanvasStyle;
   /**
@@ -38,7 +50,17 @@ export interface EditorState {
 }
 
 export interface EditorActions {
-  setLayout: (layoutId: string) => void;
+  /** Starts from a preset layout. Media stays in its box numbers. */
+  setLayout: (presetId: string) => void;
+  /** Adds a row (row stacks) or a column (everything else), keeping boxes equal. */
+  addLayer: () => void;
+  addRow: () => void;
+  addColumn: () => void;
+  /** Deletes a box and its media; later boxes move up one number. */
+  removeBox: (index: number) => void;
+  /** Drags a divider: `delta` is a fraction of the split's length. */
+  resizeDivider: (path: number[], boundary: number, delta: number) => void;
+  equalizeLayout: () => void;
   setAspectRatio: (id: AspectRatioId) => void;
   updateStyle: (patch: Partial<CanvasStyle>) => void;
 
@@ -80,7 +102,8 @@ export interface EditorActions {
 export type EditorStore = EditorState & EditorActions;
 
 const createInitialState = (): EditorState => ({
-  layoutId: DEFAULT_LAYOUT_ID,
+  layoutRoot: getPreset(DEFAULT_LAYOUT_ID).root,
+  presetId: DEFAULT_LAYOUT_ID,
   aspectRatioId: DEFAULT_ASPECT_RATIO_ID,
   style: { ...DEFAULT_STYLE },
   cells: {},
@@ -130,19 +153,80 @@ function nextAudioSource(
   return current ? firstVideo(items) : firstVideo(added);
 }
 
+/**
+ * State update for a layout that gained boxes. New boxes always start empty: any media
+ * left over at those numbers from an earlier, bigger layout is dropped.
+ */
+function growLayout(s: EditorState, layoutRoot: LayoutNode): Partial<EditorState> {
+  const before = countCells(s.layoutRoot);
+  const after = countCells(layoutRoot);
+  if (after > MAX_CELLS) return {};
+
+  const cells = { ...s.cells };
+  for (let i = before; i < after; i++) {
+    (cells[i] ?? []).forEach(revokeMedia);
+    delete cells[i];
+  }
+  return {
+    layoutRoot,
+    presetId: null,
+    cells,
+    audioSourceId: nextAudioSource(s.audioSourceId, cells),
+    swapSource: null,
+  };
+}
+
 export const useEditorStore = create<EditorStore>()((set, get) => ({
   ...createInitialState(),
 
-  setLayout: (layoutId) =>
+  setLayout: (presetId) =>
     set((s) => {
-      const cellCount = getLayout(layoutId).cells.length;
+      const layoutRoot = getPreset(presetId).root;
+      const cellCount = countCells(layoutRoot);
       const selectionOutOfRange = s.selection?.kind === 'cell' && s.selection.index >= cellCount;
       return {
-        layoutId,
+        layoutRoot,
+        presetId,
         swapSource: null,
         selection: selectionOutOfRange ? null : s.selection,
       };
     }),
+
+  addLayer: () => set((s) => growLayout(s, addLayerToTree(s.layoutRoot))),
+  addRow: () => set((s) => growLayout(s, addStrip(s.layoutRoot, 'vertical'))),
+  addColumn: () => set((s) => growLayout(s, addStrip(s.layoutRoot, 'horizontal'))),
+
+  removeBox: (index) =>
+    set((s) => {
+      const layoutRoot = removeCell(s.layoutRoot, index);
+      if (!layoutRoot) return {};
+
+      // Drop this box's media and move every later box's media down one number.
+      const cells: Record<number, CellMedia[]> = {};
+      for (const [key, items] of Object.entries(s.cells)) {
+        const i = Number(key);
+        if (i === index) items.forEach(revokeMedia);
+        else cells[i > index ? i - 1 : i] = items;
+      }
+
+      const remaining = countCells(layoutRoot);
+      return {
+        layoutRoot,
+        presetId: null,
+        cells,
+        audioSourceId: nextAudioSource(s.audioSourceId, cells),
+        swapSource: null,
+        selection: remaining > 0 ? { kind: 'cell', index: Math.min(index, remaining - 1) } : null,
+      };
+    }),
+
+  resizeDivider: (path, boundary, delta) =>
+    set((s) => ({
+      layoutRoot: resizeTreeDivider(s.layoutRoot, path, boundary, delta),
+      presetId: null,
+    })),
+
+  equalizeLayout: () => set((s) => ({ layoutRoot: equalizeTree(s.layoutRoot), presetId: null })),
 
   setAspectRatio: (aspectRatioId) => set({ aspectRatioId }),
 
@@ -190,8 +274,8 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
     }),
 
   fillEmptyCells: (newMedia) => {
-    const { cells, layoutId, audioSourceId } = get();
-    const cellCount = getLayout(layoutId).cells.length;
+    const { cells, layoutRoot, audioSourceId } = get();
+    const cellCount = countCells(layoutRoot);
     let next = cells;
     let placed = 0;
 

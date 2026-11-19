@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { getLayout } from '@/constants/layouts';
+import { countCells } from '@/utils/layoutTree';
 import { clamp } from '@/utils/math';
 import { getTimelineDuration } from '@/utils/timeline';
 import { useEditorStore } from './useEditorStore';
@@ -31,7 +31,7 @@ interface PlaybackActions {
 /** Timeline length for the current editor state. */
 export const getCurrentDuration = (): number => {
   const s = useEditorStore.getState();
-  return getTimelineDuration(s.cells, getLayout(s.layoutId).cells.length);
+  return getTimelineDuration(s.cells, countCells(s.layoutRoot));
 };
 
 export const usePlaybackStore = create<PlaybackState & PlaybackActions>()((set, get) => ({

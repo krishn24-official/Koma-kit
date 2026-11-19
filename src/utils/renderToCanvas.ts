@@ -3,8 +3,8 @@ import type {
   AspectRatio,
   CanvasStyle,
   CellMedia,
-  LayoutPreset,
   PixelRect,
+  ResolvedLayout,
   Size,
   TextOverlay,
 } from '@/types';
@@ -15,7 +15,7 @@ import { getTextRenderStyle } from './textStyle';
 import { getActiveItem, getVideoLocalTime } from './timeline';
 
 export interface TemplateSnapshot {
-  layout: LayoutPreset;
+  layout: ResolvedLayout;
   aspectRatio: AspectRatio;
   style: CanvasStyle;
   cells: Record<number, CellMedia[]>;

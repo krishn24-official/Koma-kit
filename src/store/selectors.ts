@@ -1,14 +1,16 @@
 import { useMemo } from 'react';
 import { getAspectRatio } from '@/constants/aspectRatios';
-import { getLayout } from '@/constants/layouts';
-import type { AspectRatio, CellMedia, LayoutPreset, PixelRect, TextOverlay } from '@/types';
+import type { AspectRatio, CellMedia, PixelRect, ResolvedLayout, TextOverlay } from '@/types';
 import { getCellRects } from '@/utils/layoutMath';
+import { resolveLayout } from '@/utils/layoutTree';
 import type { TemplateSnapshot } from '@/utils/renderToCanvas';
 import { getActiveItemIndex, getTimelineDuration } from '@/utils/timeline';
 import { useEditorStore } from './useEditorStore';
 import { usePlaybackStore } from './usePlaybackStore';
 
-export const useCurrentLayout = (): LayoutPreset => getLayout(useEditorStore((s) => s.layoutId));
+/** Current layout as per-cell rectangles. Stable while the layout tree is unchanged. */
+export const useCurrentLayout = (): ResolvedLayout =>
+  resolveLayout(useEditorStore((s) => s.layoutRoot));
 
 export const useCurrentAspectRatio = (): AspectRatio =>
   getAspectRatio(useEditorStore((s) => s.aspectRatioId));
@@ -69,7 +71,7 @@ export const useDesignCellRects = (): PixelRect[] => {
 export function getTemplateSnapshot(): TemplateSnapshot {
   const s = useEditorStore.getState();
   return {
-    layout: getLayout(s.layoutId),
+    layout: resolveLayout(s.layoutRoot),
     aspectRatio: getAspectRatio(s.aspectRatioId),
     style: s.style,
     cells: s.cells,

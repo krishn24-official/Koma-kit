@@ -4,6 +4,7 @@ import {
   Expand,
   ImagePlus,
   MapPin,
+  Plus,
   RefreshCw,
   Scissors,
   Shrink,
@@ -278,6 +279,7 @@ export function CellToolbar() {
   const swapSource = useEditorStore((s) => s.swapSource);
   const cancelSwap = useEditorStore((s) => s.cancelSwap);
   const removeText = useEditorStore((s) => s.removeText);
+  const addLayer = useEditorStore((s) => s.addLayer);
 
   let content: ReactNode;
 
@@ -306,7 +308,12 @@ export function CellToolbar() {
     );
   } else {
     content = (
-      <Hint>Tap a cell to add an image or video · Drag to reposition · Scroll or pinch to zoom</Hint>
+      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+        <Hint>Tap a box to add an image or video · Drag white handles to resize boxes</Hint>
+        <Button size="sm" icon={<Plus />} onClick={addLayer}>
+          Add layer
+        </Button>
+      </div>
     );
   }
 

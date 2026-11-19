@@ -4,6 +4,7 @@ import { useCurrentAspectRatio, useCurrentLayout } from '@/store/selectors';
 import { useEditorStore } from '@/store/useEditorStore';
 import { getCellRects } from '@/utils/layoutMath';
 import { GridCell } from './GridCell';
+import { LayoutDividers } from './LayoutDividers';
 import { TextOverlayItem } from './TextOverlayItem';
 
 /**
@@ -50,7 +51,9 @@ export function TemplateCanvas() {
             <GridCell key={index} index={index} rect={rect} radius={style.radius * unit} />
           ))}
 
-          <div className="pointer-events-none absolute inset-0">
+          <LayoutDividers canvasSize={canvasSize} padding={style.padding * unit} />
+
+          <div className="pointer-events-none absolute inset-0 z-20">
             {texts.map((text) => (
               <TextOverlayItem key={text.id} text={text} unit={unit} canvasSize={canvasSize} />
             ))}
