@@ -17,12 +17,16 @@ export function useKeyboardShortcuts() {
     const onKeyDown = (event: KeyboardEvent) => {
       if (isTypingTarget(event.target)) return;
 
-      // While cropping, only Escape (cancel) does anything.
-      if (useUiStore.getState().cropRect) {
-        if (event.key === 'Escape') useUiStore.getState().setCropRect(null);
+      // While cropping (canvas or a logo), only Escape (cancel) does anything.
+      const ui = useUiStore.getState();
+      if (ui.cropRect || ui.stickerCrop) {
+        if (event.key === 'Escape') {
+          ui.setCropRect(null);
+          ui.setStickerCrop(null);
+        }
         return;
       }
-      const { selection, cells, removeItem, removeText, clearSelection } =
+      const { selection, cells, removeItem, removeElement, clearSelection } =
         useEditorStore.getState();
 
       if (event.key === 'Escape') {
@@ -39,8 +43,8 @@ export function useKeyboardShortcuts() {
 
       if ((event.key === 'Delete' || event.key === 'Backspace') && selection) {
         event.preventDefault();
-        if (selection.kind === 'text') {
-          removeText(selection.id);
+        if (selection.kind === 'element') {
+          removeElement(selection.id);
           return;
         }
         const item = getActiveItem(cells[selection.index], usePlaybackStore.getState().currentTime);

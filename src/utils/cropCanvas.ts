@@ -7,7 +7,7 @@ import type {
   CellRect,
   ImageTransform,
   PixelRect,
-  TextOverlay,
+  CanvasElement,
 } from '@/types';
 import { clampTransform, getCoverScale, getImageRect, getImageSize } from './imageTransform';
 import { getCellRects } from './layoutMath';
@@ -18,10 +18,10 @@ export interface CropInput {
   style: CanvasStyle;
   layoutCells: CellRect[];
   cells: Record<number, CellMedia[]>;
-  texts: TextOverlay[];
+  elements: CanvasElement[];
 }
 
-export type CropResult = Pick<CropInput, 'canvasSize' | 'style' | 'cells' | 'texts'>;
+export type CropResult = Pick<CropInput, 'canvasSize' | 'style' | 'cells' | 'elements'>;
 
 /**
  * Transform that draws an item at `target` (absolute design pixels) inside `cell`.
@@ -88,12 +88,18 @@ export function cropCanvas(input: CropInput, crop: CellRect): CropResult {
     });
   }
 
-  const texts = input.texts.map((text) => ({
-    ...text,
-    x: (text.x * old.width - x0) / cropW,
-    y: (text.y * old.height - y0) / cropH,
-    fontSize: text.fontSize * k,
-  }));
+  const elements = input.elements.map((el): CanvasElement => {
+    const moved = {
+      ...el,
+      x: (el.x * old.width - x0) / cropW,
+      y: (el.y * old.height - y0) / cropH,
+    };
+    if (moved.type === 'sticker') return { ...moved, width: moved.width * k };
+    if (moved.type === 'badge') {
+      return { ...moved, fontSize: moved.fontSize * k, borderWidth: moved.borderWidth * k };
+    }
+    return { ...moved, fontSize: moved.fontSize * k };
+  });
 
-  return { canvasSize, style, cells, texts };
+  return { canvasSize, style, cells, elements };
 }

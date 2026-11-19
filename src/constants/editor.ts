@@ -1,6 +1,4 @@
-import type { CanvasStyle, ExportFormat, ExportOptions, ImageTransform, TextOverlay } from '@/types';
-import { createId } from '@/utils/id';
-import { DEFAULT_FONT_ID } from './fonts';
+import type { CanvasStyle, ExportFormat, ExportOptions, ImageTransform } from '@/types';
 
 /** Maximum zoom, relative to "cover" (image exactly filling its cell). */
 export const MAX_ZOOM = 5;
@@ -62,25 +60,7 @@ export const TEXT_COLOR_SWATCHES = [
   '#a855f7',
 ];
 
-export const TEXT_LIMITS = {
-  fontSize: { min: 16, max: 260 },
-  strokeWidth: { min: 0, max: 20 },
-} as const;
-
 export const TEXT_LINE_HEIGHT = 1.15;
-
-export const createDefaultText = (): TextOverlay => ({
-  id: createId(),
-  text: 'Your title',
-  x: 0.5,
-  y: 0.5,
-  fontId: DEFAULT_FONT_ID,
-  fontSize: 96,
-  color: '#ffffff',
-  strokeColor: '#000000',
-  strokeWidth: 6,
-  shadow: true,
-});
 
 export const EXPORT_SCALES = [
   { value: 1, label: '1×' },

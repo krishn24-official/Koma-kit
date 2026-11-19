@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { DEFAULT_CANVAS_SIZE, getExactScale } from '@/constants/canvasSizes';
+import { createId } from '@/utils/id';
 import {
-  createDefaultText,
   DEFAULT_EXPORT_OPTIONS,
   DEFAULT_STYLE,
   EXPORT_SCALES,
@@ -27,7 +27,8 @@ import type {
   ImageTransform,
   LayoutNode,
   Selection,
-  TextOverlay,
+  BoxFade,
+  CanvasElement,
 } from '@/types';
 import { clamp } from '@/utils/math';
 import { revokeMedia } from '@/utils/media';
@@ -51,7 +52,10 @@ export interface EditorState {
   cells: Record<number, CellMedia[]>;
   /** Video whose original audio is played in the preview and saved in the MP4. */
   audioSourceId: string | null;
-  texts: TextOverlay[];
+  /** Box fades (color gradients over a box), by box number. */
+  boxFades: Record<number, BoxFade>;
+  /** Text, stickers and badges placed freely on the canvas, bottom to top. */
+  elements: CanvasElement[];
   selection: Selection;
   /** Cell waiting for a second cell to swap with. */
   swapSource: number | null;
@@ -108,15 +112,39 @@ export interface EditorActions {
   select: (selection: Selection) => void;
   clearSelection: () => void;
 
-  addText: (partial?: Partial<Omit<TextOverlay, 'id'>>) => string;
-  updateText: (id: string, patch: Partial<Omit<TextOverlay, 'id'>>) => void;
-  removeText: (id: string) => void;
+  /** Adds an element on top and selects it. */
+  addElement: (element: CanvasElement) => void;
+  updateElement: (id: string, patch: Partial<CanvasElement>) => void;
+  removeElement: (id: string) => void;
+  duplicateElement: (id: string) => void;
+  /** Moves an element one step up (+1) or down (-1) in the stacking order. */
+  moveElement: (id: string, step: 1 | -1) => void;
+  setBoxFade: (index: number, fade: BoxFade | null) => void;
+  /** Replaces the whole design with a starter template. */
+  loadTemplate: (design: TemplateDesign) => void;
 
   updateExportOptions: (patch: Partial<ExportOptions>) => void;
   resetProject: () => void;
 }
 
 export type EditorStore = EditorState & EditorActions;
+
+/** What a starter template sets; anything left out starts from the defaults. */
+export type TemplateDesign = Partial<
+  Pick<
+    EditorState,
+    'layoutRoot' | 'presetId' | 'canvasSize' | 'style' | 'boxFades' | 'elements' | 'cells'
+  >
+>;
+
+/** Frees every object URL the design holds (media, stickers, background). */
+function freeAllPictures(s: EditorState): void {
+  allItems(s.cells).forEach(revokeMedia);
+  if (s.style.backgroundImage) URL.revokeObjectURL(s.style.backgroundImage.src);
+  s.elements.forEach((el) => {
+    if (el.type === 'sticker' && el.src) URL.revokeObjectURL(el.src);
+  });
+}
 
 const createInitialState = (): EditorState => ({
   layoutRoot: getPreset(DEFAULT_LAYOUT_ID).root,
@@ -125,7 +153,8 @@ const createInitialState = (): EditorState => ({
   style: { ...DEFAULT_STYLE },
   cells: {},
   audioSourceId: null,
-  texts: [],
+  boxFades: {},
+  elements: [],
   selection: null,
   swapSource: null,
   exportOptions: { ...DEFAULT_EXPORT_OPTIONS },
@@ -180,14 +209,17 @@ function growLayout(s: EditorState, layoutRoot: LayoutNode): Partial<EditorState
   if (after > MAX_CELLS) return {};
 
   const cells = { ...s.cells };
+  const boxFades = { ...s.boxFades };
   for (let i = before; i < after; i++) {
     (cells[i] ?? []).forEach(revokeMedia);
     delete cells[i];
+    delete boxFades[i];
   }
   return {
     layoutRoot,
     presetId: null,
     cells,
+    boxFades,
     audioSourceId: nextAudioSource(s.audioSourceId, cells),
     swapSource: null,
   };
@@ -226,11 +258,18 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
         else cells[i > index ? i - 1 : i] = items;
       }
 
+      const boxFades: Record<number, BoxFade> = {};
+      for (const [key, fade] of Object.entries(s.boxFades)) {
+        const i = Number(key);
+        if (i !== index) boxFades[i > index ? i - 1 : i] = fade;
+      }
+
       const remaining = countCells(layoutRoot);
       return {
         layoutRoot,
         presetId: null,
         cells,
+        boxFades,
         audioSourceId: nextAudioSource(s.audioSourceId, cells),
         swapSource: null,
         selection: remaining > 0 ? { kind: 'cell', index: Math.min(index, remaining - 1) } : null,
@@ -264,7 +303,7 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
           style: s.style,
           layoutCells: resolveLayout(s.layoutRoot).cells,
           cells: s.cells,
-          texts: s.texts,
+          elements: s.elements,
         },
         rect,
       ),
@@ -424,34 +463,94 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
       delete cells[b];
       if (itemsA) cells[b] = itemsA;
       if (itemsB) cells[a] = itemsB;
+      // Fades stay with their boxes: they belong to the position, not the picture.
       return { cells, swapSource: null, selection: { kind: 'cell', index: b } };
     }),
 
   select: (selection) => set({ selection }),
   clearSelection: () => set({ selection: null, swapSource: null }),
 
-  addText: (partial) => {
-    const text: TextOverlay = { ...createDefaultText(), ...partial };
-    set((s) => ({ texts: [...s.texts, text], selection: { kind: 'text', id: text.id } }));
-    return text.id;
-  },
-
-  updateText: (id, patch) =>
-    set((s) => ({ texts: s.texts.map((t) => (t.id === id ? { ...t, ...patch } : t)) })),
-
-  removeText: (id) =>
+  addElement: (element) =>
     set((s) => ({
-      texts: s.texts.filter((t) => t.id !== id),
-      selection: s.selection?.kind === 'text' && s.selection.id === id ? null : s.selection,
+      elements: [...s.elements, element],
+      selection: { kind: 'element', id: element.id },
     })),
+
+  updateElement: (id, patch) =>
+    set((s) => ({
+      elements: s.elements.map((el) => {
+        if (el.id !== id) return el;
+        // Replacing a sticker's picture frees the old one.
+        if (el.type === 'sticker' && 'src' in patch && el.src && patch.src !== el.src) {
+          URL.revokeObjectURL(el.src);
+        }
+        return { ...el, ...patch } as CanvasElement;
+      }),
+    })),
+
+  removeElement: (id) =>
+    set((s) => {
+      const el = s.elements.find((e) => e.id === id);
+      if (el?.type === 'sticker' && el.src) URL.revokeObjectURL(el.src);
+      return {
+        elements: s.elements.filter((e) => e.id !== id),
+        selection: s.selection?.kind === 'element' && s.selection.id === id ? null : s.selection,
+      };
+    }),
+
+  duplicateElement: (id) =>
+    set((s) => {
+      const el = s.elements.find((e) => e.id === id);
+      if (!el) return {};
+      // A copied sticker gets its own object URL, so deleting one keeps the other.
+      const src = el.type === 'sticker' && el.file ? URL.createObjectURL(el.file) : null;
+      const copy = {
+        ...el,
+        ...(el.type === 'sticker' ? { src: src ?? el.src } : {}),
+        id: createId(),
+        x: Math.min(1, el.x + 0.03),
+        y: Math.min(1, el.y + 0.03),
+      } as CanvasElement;
+      return { elements: [...s.elements, copy], selection: { kind: 'element', id: copy.id } };
+    }),
+
+  moveElement: (id, step) =>
+    set((s) => {
+      const from = s.elements.findIndex((e) => e.id === id);
+      const to = from + step;
+      if (from < 0 || to < 0 || to >= s.elements.length) return {};
+      const elements = [...s.elements];
+      [elements[from], elements[to]] = [elements[to]!, elements[from]!];
+      return { elements };
+    }),
+
+  setBoxFade: (index, fade) =>
+    set((s) => {
+      const boxFades = { ...s.boxFades };
+      if (fade) boxFades[index] = fade;
+      else delete boxFades[index];
+      return { boxFades };
+    }),
+
+  loadTemplate: (design) => {
+    freeAllPictures(get());
+    const canvasSize = design.canvasSize ?? DEFAULT_CANVAS_SIZE;
+    set({
+      ...createInitialState(),
+      ...design,
+      exportOptions: {
+        ...get().exportOptions,
+        scale: canvasSize.exact ? getExactScale(canvasSize) : DEFAULT_EXPORT_OPTIONS.scale,
+      },
+    });
+  },
 
   updateExportOptions: (patch) =>
     set((s) => ({ exportOptions: { ...s.exportOptions, ...patch } })),
 
   resetProject: () => {
-    const { cells, exportOptions, style } = get();
-    allItems(cells).forEach(revokeMedia);
-    if (style.backgroundImage) URL.revokeObjectURL(style.backgroundImage.src);
+    const { exportOptions } = get();
+    freeAllPictures(get());
     // Keep the user's export preferences, except an exact size tied to the old canvas.
     set({
       ...createInitialState(),

@@ -28,8 +28,7 @@ import type { CellMedia } from '@/types';
 import { loadImage } from './media';
 import {
   drawTemplate,
-  loadBackgroundImage,
-  loadTextFonts,
+  loadDrawAssets,
   type TemplateSnapshot,
 } from './renderToCanvas';
 import {
@@ -108,15 +107,14 @@ export async function exportVideo(
   });
 
   try {
-    // Images and fonts are loaded once up front.
-    const [images, background] = await Promise.all([
+    // Pictures, fonts and stickers are loaded once up front.
+    const [images, assets] = await Promise.all([
       Promise.all(
         visibleItems
           .filter((item) => item.kind === 'image')
           .map(async (item) => [item.id, await loadImage(item.src)] as const),
       ).then((entries) => new Map(entries)),
-      loadBackgroundImage(snapshot),
-      loadTextFonts(snapshot.texts),
+      loadDrawAssets(snapshot),
     ]);
 
     // One frame decoder per video. It is asked for exactly the timestamps where that
@@ -210,7 +208,7 @@ export async function exportVideo(
             item.kind === 'image'
               ? (images.get(item.id) ?? null)
               : (readers.get(item.id)?.current ?? null),
-          background,
+          assets,
         );
         await videoSource.add(t, 1 / fps);
         options.onProgress((f + 1) / frameCount);

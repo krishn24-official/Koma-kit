@@ -13,6 +13,7 @@ export function useCrop() {
   const start = useCallback(() => {
     usePlaybackStore.getState().pause();
     useEditorStore.getState().clearSelection();
+    useUiStore.getState().setStickerCrop(null); // only one crop at a time
     setCropRect(FULL);
   }, [setCropRect]);
 

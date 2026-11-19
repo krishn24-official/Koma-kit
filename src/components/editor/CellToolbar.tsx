@@ -26,6 +26,7 @@ import { Slider } from '@/components/ui/Slider';
 import { DEFAULT_TRANSFORM } from '@/constants/editor';
 import { useCrop } from '@/hooks/useCrop';
 import { useFitToPictures } from '@/hooks/useFitToPictures';
+import { useStickerCrop } from '@/hooks/useStickerCrop';
 import { useMediaUpload } from '@/hooks/useMediaUpload';
 import { useActiveItem, useDesignCellRects, useTimelineDuration } from '@/store/selectors';
 import { useEditorStore } from '@/store/useEditorStore';
@@ -286,15 +287,40 @@ export function CellToolbar() {
   const selection = useEditorStore((s) => s.selection);
   const swapSource = useEditorStore((s) => s.swapSource);
   const cancelSwap = useEditorStore((s) => s.cancelSwap);
-  const removeText = useEditorStore((s) => s.removeText);
+  const removeElement = useEditorStore((s) => s.removeElement);
   const addLayer = useEditorStore((s) => s.addLayer);
   const fitToPictures = useFitToPictures();
   const isCropping = useUiStore((s) => s.cropRect !== null);
   const crop = useCrop();
+  const stickerCrop = useStickerCrop();
+  const stickerCropping = useUiStore((s) => s.stickerCrop !== null);
+  const selectedIsPicture = useEditorStore((s) => {
+    const sel = s.selection;
+    if (sel?.kind !== 'element') return false;
+    const el = s.elements.find((e) => e.id === sel.id);
+    return el?.type === 'sticker' && Boolean(el.src);
+  });
 
   let content: ReactNode;
 
-  if (isCropping) {
+  if (stickerCropping) {
+    content = (
+      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
+        <Hint>Drag the frame's edges or corners to cut the logo.</Hint>
+        <div className="flex gap-2">
+          <Button size="sm" variant="ghost" onClick={stickerCrop.reset}>
+            Reset
+          </Button>
+          <Button size="sm" onClick={stickerCrop.cancel}>
+            Cancel
+          </Button>
+          <Button size="sm" variant="primary" icon={<Check />} onClick={stickerCrop.apply}>
+            Apply crop
+          </Button>
+        </div>
+      </div>
+    );
+  } else if (isCropping) {
     content = (
       <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
         <Hint>Drag the edges or corners. They snap to your pictures.</Hint>
@@ -322,15 +348,20 @@ export function CellToolbar() {
     );
   } else if (selection?.kind === 'cell') {
     content = <CellControls key={selection.index} index={selection.index} />;
-  } else if (selection?.kind === 'text') {
+  } else if (selection?.kind === 'element') {
     content = (
       <div className="flex items-center gap-3">
-        <Hint>Drag to move. Edit the text in the Text panel.</Hint>
+        <Hint>Drag to move, drag the corner dot to resize. More options in Elements.</Hint>
+        {selectedIsPicture && (
+          <Button size="sm" icon={<CropIcon />} onClick={() => stickerCrop.start(selection.id)}>
+            Crop
+          </Button>
+        )}
         <IconButton
-          label="Delete text"
+          label="Delete"
           variant="danger"
           icon={<Trash2 />}
-          onClick={() => removeText(selection.id)}
+          onClick={() => removeElement(selection.id)}
         />
       </div>
     );

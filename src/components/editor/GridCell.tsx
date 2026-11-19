@@ -5,6 +5,7 @@ import { useMediaUpload } from '@/hooks/useMediaUpload';
 import { useActiveItem } from '@/store/selectors';
 import { useEditorStore } from '@/store/useEditorStore';
 import type { PixelRect } from '@/types';
+import { boxFadeCss } from '@/utils/background';
 import { formatTime } from '@/utils/timeline';
 import { CellImageView } from './CellImageView';
 import { CellVideoView } from './CellVideoView';
@@ -23,6 +24,7 @@ export function GridCell({ index, rect, radius }: GridCellProps) {
     (s) => s.selection?.kind === 'cell' && s.selection.index === index,
   );
   const swapSource = useEditorStore((s) => s.swapSource);
+  const fade = useEditorStore((s) => s.boxFades[index]);
   const select = useEditorStore((s) => s.select);
   const swapCells = useEditorStore((s) => s.swapCells);
   const { uploadToCell } = useMediaUpload();
@@ -88,6 +90,13 @@ export function GridCell({ index, rect, radius }: GridCellProps) {
             // Cells with something scheduled later just get selected (pointer down).
             if (!isSwapTarget && !upcoming) inputRef.current?.click();
           }}
+        />
+      )}
+
+      {fade && (
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{ background: boxFadeCss(fade) }}
         />
       )}
 

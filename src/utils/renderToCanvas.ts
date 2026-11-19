@@ -1,18 +1,19 @@
-import { toCssFont } from '@/constants/fonts';
 import type {
   AspectRatio,
+  BoxFade,
+  CanvasElement,
   CanvasStyle,
   CellMedia,
   PixelRect,
   ResolvedLayout,
   Size,
-  TextOverlay,
 } from '@/types';
-import { drawBackground } from './background';
+import { drawBackground, drawBoxFade } from './background';
+import { drawElements } from './drawElements';
+import { elementFonts } from './elements';
 import { getImageRect, getImageSize } from './imageTransform';
 import { getCellRects } from './layoutMath';
 import { loadImage, loadVideoFrame, releaseVideo } from './media';
-import { getTextRenderStyle } from './textStyle';
 import { getActiveItem, getVideoLocalTime } from './timeline';
 
 export interface TemplateSnapshot {
@@ -20,12 +21,19 @@ export interface TemplateSnapshot {
   aspectRatio: AspectRatio;
   style: CanvasStyle;
   cells: Record<number, CellMedia[]>;
-  texts: TextOverlay[];
+  boxFades: Record<number, BoxFade>;
+  elements: CanvasElement[];
   audioSourceId: string | null;
 }
 
 /** Returns something drawable for an item (image, video frame, decoded canvas). */
 export type MediaResolver = (item: CellMedia) => CanvasImageSource | null;
+
+/** Pictures that don't change over time, loaded once per export. */
+export interface DrawAssets {
+  background: CanvasImageSource | null;
+  stickers: Map<string, CanvasImageSource>;
+}
 
 function traceRoundedRect(ctx: CanvasRenderingContext2D, rect: PixelRect, radius: number): void {
   const { x, y, width: w, height: h } = rect;
@@ -43,69 +51,35 @@ function traceRoundedRect(ctx: CanvasRenderingContext2D, rect: PixelRect, radius
   ctx.closePath();
 }
 
-/** Loads the background picture if the template uses one. */
-export async function loadBackgroundImage(
-  snapshot: TemplateSnapshot,
-): Promise<HTMLImageElement | null> {
-  const { backgroundType, backgroundImage } = snapshot.style;
-  return backgroundType === 'image' && backgroundImage ? loadImage(backgroundImage.src) : null;
-}
+/**
+ * Loads fonts, the background picture and sticker pictures. Canvas silently falls
+ * back to another font if one isn't ready, so fonts must be loaded first.
+ */
+export async function loadDrawAssets(snapshot: TemplateSnapshot): Promise<DrawAssets> {
+  const { style, elements } = snapshot;
 
-/** Makes sure web fonts are ready; canvas silently falls back otherwise. */
-export async function loadTextFonts(texts: TextOverlay[]): Promise<void> {
-  if (!('fonts' in document)) return;
-  const fonts = new Set(texts.map((t) => toCssFont(getTextRenderStyle(t, 1).font, 64)));
-  await Promise.all([...fonts].map((font) => document.fonts.load(font).catch(() => undefined)));
-}
+  const fonts =
+    'fonts' in document
+      ? Promise.all(
+          elementFonts(elements).map((font) => document.fonts.load(font).catch(() => undefined)),
+        )
+      : Promise.resolve();
 
-function drawText(
-  ctx: CanvasRenderingContext2D,
-  text: TextOverlay,
-  canvasWidth: number,
-  canvasHeight: number,
-  unit: number,
-): void {
-  const style = getTextRenderStyle(text, unit);
-  const centerX = text.x * canvasWidth;
-  const top = text.y * canvasHeight - (style.lineHeight * style.lines.length) / 2;
+  const background =
+    style.backgroundType === 'image' && style.backgroundImage
+      ? loadImage(style.backgroundImage.src)
+      : Promise.resolve(null);
 
-  ctx.save();
-  ctx.font = style.cssFont;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.lineJoin = 'round';
+  const stickers = Promise.all(
+    elements.flatMap((el) =>
+      el.type === 'sticker' && el.src
+        ? [loadImage(el.src).then((img) => [el.id, img] as const)]
+        : [],
+    ),
+  ).then((entries) => new Map<string, CanvasImageSource>(entries));
 
-  const applyShadow = () => {
-    if (!style.shadow) return;
-    ctx.shadowColor = style.shadow.color;
-    ctx.shadowBlur = style.shadow.blur;
-    ctx.shadowOffsetY = style.shadow.offsetY;
-  };
-  const clearShadow = () => {
-    ctx.shadowColor = 'transparent';
-  };
-
-  style.lines.forEach((line, i) => {
-    const y = top + style.lineHeight * (i + 0.5);
-
-    // Stroke first, then fill on top, so the outline sits outside the letters
-    // (same result as CSS `paint-order: stroke fill`).
-    if (style.outline > 0) {
-      applyShadow();
-      ctx.lineWidth = style.outline * 2;
-      ctx.strokeStyle = text.strokeColor;
-      ctx.strokeText(line, centerX, y);
-      clearShadow();
-    } else {
-      applyShadow();
-    }
-
-    ctx.fillStyle = text.color;
-    ctx.fillText(line, centerX, y);
-    clearShadow();
-  });
-
-  ctx.restore();
+  const [bg, stickerMap] = await Promise.all([background, stickers, fonts]);
+  return { background: bg, stickers: stickerMap };
 }
 
 /**
@@ -118,37 +92,40 @@ export function drawTemplate(
   size: Size,
   time: number,
   resolve: MediaResolver,
-  /** Loaded background picture, when the background type is "image". */
-  backgroundImage: CanvasImageSource | null = null,
+  assets: DrawAssets,
 ): void {
-  const { layout, aspectRatio, style, cells, texts } = snapshot;
+  const { layout, aspectRatio, style, cells, boxFades, elements } = snapshot;
   const unit = size.width / aspectRatio.width;
   const rects = getCellRects(layout.cells, size, style, unit);
 
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
-  drawBackground(ctx, style, size, unit, backgroundImage);
+  drawBackground(ctx, style, size, unit, assets.background);
 
   rects.forEach((rect, i) => {
     const item = getActiveItem(cells[i], time);
     const source = item ? resolve(item) : null;
-    if (!item || !source) return;
+    const fade = boxFades[i];
+    if (!(item && source) && !fade) return;
 
-    const drawRect = getImageRect(getImageSize(item), rect, item.transform);
     ctx.save();
     traceRoundedRect(ctx, rect, style.radius * unit);
     ctx.clip();
-    ctx.drawImage(
-      source,
-      rect.x + drawRect.x,
-      rect.y + drawRect.y,
-      drawRect.width,
-      drawRect.height,
-    );
+    if (item && source) {
+      const drawRect = getImageRect(getImageSize(item), rect, item.transform);
+      ctx.drawImage(
+        source,
+        rect.x + drawRect.x,
+        rect.y + drawRect.y,
+        drawRect.width,
+        drawRect.height,
+      );
+    }
+    if (fade) drawBoxFade(ctx, rect, fade);
     ctx.restore();
   });
 
-  texts.forEach((text) => drawText(ctx, text, size.width, size.height, unit));
+  drawElements(ctx, elements, size, unit, assets.stickers);
 }
 
 /** Renders a still image of the template at timeline `time` and resolution `scale`. */
@@ -172,14 +149,10 @@ export async function renderStill(
 
   const sources = new Map<string, CanvasImageSource>();
   const videos: HTMLVideoElement[] = [];
-  let background: CanvasImageSource | null = null;
 
   try {
-    await Promise.all([
-      loadTextFonts(snapshot.texts),
-      loadBackgroundImage(snapshot).then((img) => {
-        background = img;
-      }),
+    const [assets] = await Promise.all([
+      loadDrawAssets(snapshot),
       ...active.map(async (item) => {
         if (item.kind === 'image') {
           sources.set(item.id, await loadImage(item.src));
@@ -197,7 +170,7 @@ export async function renderStill(
       { width, height },
       time,
       (item) => sources.get(item.id) ?? null,
-      background,
+      assets,
     );
     return canvas;
   } finally {

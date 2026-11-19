@@ -1,4 +1,4 @@
-import type { CanvasStyle, PixelRect, Size } from '@/types';
+import type { BoxFade, CanvasStyle, PixelRect, Size } from '@/types';
 import { getCoverScale } from './imageTransform';
 
 /** CSS for the gradient background (the editor preview). */
@@ -77,4 +77,58 @@ export function drawBackground(
       ctx.fillRect(0, 0, size.width, size.height);
     }
   }
+}
+
+/** "#0a0f1e" + 0.5 → "rgba(10, 15, 30, 0.5)" */
+export function hexToRgba(hex: string, alpha: number): string {
+  const h = hex.replace('#', '');
+  const full = h.length === 3 ? [...h].map((c) => c + c).join('') : h;
+  const n = parseInt(full, 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
+
+type FadeDirection = 'to right' | 'to left' | 'to bottom' | 'to top';
+
+/** Direction and [position 0–1, opacity] stops for a fade; shared by CSS and canvas. */
+function fadeStops(fade: BoxFade): { direction: FadeDirection; stops: Array<[number, number]> } {
+  const op = fade.opacity;
+  const reach = Math.max(0.001, fade.reach);
+  switch (fade.from) {
+    case 'full':
+      return { direction: 'to right', stops: [[0, op], [1, op]] };
+    case 'sides':
+      return {
+        direction: 'to right',
+        stops: [[0, op], [reach / 2, 0], [1 - reach / 2, 0], [1, op]],
+      };
+    default: {
+      const direction = ({ left: 'to right', right: 'to left', top: 'to bottom', bottom: 'to top' } as const)[
+        fade.from
+      ];
+      return { direction, stops: [[0, op], [reach, 0]] };
+    }
+  }
+}
+
+/** CSS for a box fade (the editor preview). */
+export function boxFadeCss(fade: BoxFade): string {
+  const { direction, stops } = fadeStops(fade);
+  const parts = stops.map(([at, alpha]) => `${hexToRgba(fade.color, alpha)} ${at * 100}%`);
+  return `linear-gradient(${direction}, ${parts.join(', ')})`;
+}
+
+/** Paints a box fade over `rect`. Call inside the box's clip. */
+export function drawBoxFade(ctx: CanvasRenderingContext2D, rect: PixelRect, fade: BoxFade): void {
+  const { x, y, width: w, height: h } = rect;
+  const { direction, stops } = fadeStops(fade);
+  const line: Record<FadeDirection, [number, number, number, number]> = {
+    'to right': [x, y, x + w, y],
+    'to left': [x + w, y, x, y],
+    'to bottom': [x, y, x, y + h],
+    'to top': [x, y + h, x, y],
+  };
+  const gradient = ctx.createLinearGradient(...line[direction]);
+  stops.forEach(([at, alpha]) => gradient.addColorStop(at, hexToRgba(fade.color, alpha)));
+  ctx.fillStyle = gradient;
+  ctx.fillRect(x, y, w, h);
 }

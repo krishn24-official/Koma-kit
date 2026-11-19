@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { toDesignSize } from '@/constants/canvasSizes';
-import type { AspectRatio, CellMedia, PixelRect, ResolvedLayout, TextOverlay } from '@/types';
+import type { AspectRatio, CanvasElement, CellMedia, PixelRect, ResolvedLayout } from '@/types';
 import { getCellRects } from '@/utils/layoutMath';
 import { resolveLayout } from '@/utils/layoutTree';
 import type { TemplateSnapshot } from '@/utils/renderToCanvas';
@@ -18,11 +18,11 @@ export const useCurrentAspectRatio = (): AspectRatio => {
   return useMemo(() => toDesignSize(canvasSize), [canvasSize]);
 };
 
-export const useSelectedText = (): TextOverlay | null =>
+export const useSelectedElement = (): CanvasElement | null =>
   useEditorStore((s) => {
     const selection = s.selection;
-    if (selection?.kind !== 'text') return null;
-    return s.texts.find((t) => t.id === selection.id) ?? null;
+    if (selection?.kind !== 'element') return null;
+    return s.elements.find((el) => el.id === selection.id) ?? null;
   });
 
 /** Number of visible cells that have at least one item. */
@@ -78,7 +78,8 @@ export function getTemplateSnapshot(): TemplateSnapshot {
     aspectRatio: toDesignSize(s.canvasSize),
     style: s.style,
     cells: s.cells,
-    texts: s.texts,
+    elements: s.elements,
+    boxFades: s.boxFades,
     audioSourceId: s.audioSourceId,
   };
 }

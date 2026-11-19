@@ -94,23 +94,100 @@ export interface FontOption {
   weight: number;
 }
 
-export interface TextOverlay {
+import type { CellRect } from './layout';
+
+export type TextAlign = 'left' | 'center' | 'right';
+
+/** Shared by everything placed freely on the canvas. */
+interface ElementBase {
   id: string;
-  text: string;
-  /** Centre position as a fraction of canvas width / height. */
+  /**
+   * Anchor position as a fraction of canvas width / height. The anchor is the
+   * element's centre, except for left/right-aligned text where it is the left/right
+   * edge (so lines of text stay aligned when edited).
+   */
   x: number;
   y: number;
+  /** Degrees, clockwise, around the anchor. */
+  rotation: number;
+  /** 0–1 */
+  opacity: number;
+}
+
+export interface TextElement extends ElementBase {
+  type: 'text';
+  text: string;
   fontId: string;
   /** Font size in design units. */
   fontSize: number;
+  align: TextAlign;
+  /** Extra space between letters, as a percentage of the font size. */
+  letterSpacing: number;
   color: string;
   strokeColor: string;
-  /** Visible outline thickness as a percentage of the font size. */
+  /** Visible outline thickness as a percentage of the font size (0 = none). */
   strokeWidth: number;
   shadow: boolean;
 }
 
-export type Selection = { kind: 'cell'; index: number } | { kind: 'text'; id: string } | null;
+/** An uploaded picture (logo, sticker). `src` is null for an empty placeholder. */
+export interface StickerElement extends ElementBase {
+  type: 'sticker';
+  src: string | null;
+  file: File | null;
+  naturalWidth: number;
+  naturalHeight: number;
+  /** Part of the picture shown, as fractions of it (x, y, w, h). Full = 0, 0, 1, 1. */
+  crop: CellRect;
+  /** Width in design units of the shown (cropped) part; height follows its shape. */
+  width: number;
+  /** Placeholder label, e.g. "Anime logo". */
+  label: string;
+}
+
+/** A label in a rounded box, e.g. "NEW INFO". */
+export interface BadgeElement extends ElementBase {
+  type: 'badge';
+  text: string;
+  fontId: string;
+  fontSize: number;
+  letterSpacing: number;
+  textColor: string;
+  /** Fill color, or null for transparent. */
+  fill: string | null;
+  borderColor: string;
+  /** Border thickness in design units (0 = none). */
+  borderWidth: number;
+  /** Space around the text, as multiples of the font size. */
+  paddingX: number;
+  paddingY: number;
+  /** Corner roundness: 0 = square, 1 = fully rounded pill. */
+  roundness: number;
+}
+
+export type CanvasElement = TextElement | StickerElement | BadgeElement;
+export type ElementType = CanvasElement['type'];
+
+/**
+ * A color fade over a box's picture, e.g. dark on the left so text stays readable.
+ */
+export interface BoxFade {
+  color: string;
+  /** Strength at the strongest edge, 0–1. */
+  opacity: number;
+  /**
+   * Side the fade starts from. 'sides' darkens left and right (art in the middle);
+   * 'full' tints the whole box evenly.
+   */
+  from: 'left' | 'right' | 'top' | 'bottom' | 'sides' | 'full';
+  /** How far across the box the fade reaches, 0–1. */
+  reach: number;
+}
+
+export type Selection =
+  | { kind: 'cell'; index: number }
+  | { kind: 'element'; id: string }
+  | null;
 
 export type ExportFormat = 'png' | 'jpeg' | 'mp4';
 

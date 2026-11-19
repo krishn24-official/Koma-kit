@@ -1,10 +1,10 @@
-import { Frame, LayoutGrid, Palette, Type, type LucideIcon } from 'lucide-react';
+import { Frame, LayoutGrid, Palette, Shapes, type LucideIcon } from 'lucide-react';
 import type { ComponentType } from 'react';
 import type { PanelId } from '@/store/useUiStore';
 import { CanvasPanel } from './CanvasPanel';
 import { LayoutPanel } from './LayoutPanel';
 import { StylePanel } from './StylePanel';
-import { TextPanel } from './TextPanel';
+import { ElementsPanel } from './ElementsPanel';
 
 export interface PanelDefinition {
   id: PanelId;
@@ -18,5 +18,5 @@ export const PANELS: PanelDefinition[] = [
   { id: 'layout', label: 'Layout', icon: LayoutGrid, component: LayoutPanel },
   { id: 'canvas', label: 'Canvas', icon: Frame, component: CanvasPanel },
   { id: 'style', label: 'Style', icon: Palette, component: StylePanel },
-  { id: 'text', label: 'Text', icon: Type, component: TextPanel },
+  { id: 'elements', label: 'Elements', icon: Shapes, component: ElementsPanel },
 ];

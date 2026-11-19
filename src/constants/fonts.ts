@@ -9,7 +9,9 @@ export const FONTS: FontOption[] = [
   { id: 'playfair', label: 'Playfair', family: 'Playfair Display', weight: 700 },
   { id: 'cinzel', label: 'Cinzel', family: 'Cinzel', weight: 700 },
   { id: 'oswald', label: 'Oswald', family: 'Oswald', weight: 700 },
-  { id: 'inter', label: 'Inter', family: 'Inter', weight: 800 },
+  { id: 'inter', label: 'Inter Bold', family: 'Inter', weight: 800 },
+  { id: 'inter-regular', label: 'Inter', family: 'Inter', weight: 500 },
+  { id: 'montserrat-black', label: 'Montserrat', family: 'Montserrat', weight: 900 },
 ];
 
 export const DEFAULT_FONT_ID = 'bangers';

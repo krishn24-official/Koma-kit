@@ -10,7 +10,7 @@ import { CanvasResizeHandles } from './CanvasResizeHandles';
 import { CropOverlay } from './CropOverlay';
 import { GridCell } from './GridCell';
 import { LayoutDividers } from './LayoutDividers';
-import { TextOverlayItem } from './TextOverlayItem';
+import { ElementView } from './ElementView';
 
 /** Space kept around the canvas for its resize grips. */
 const HANDLE_ROOM = 24;
@@ -25,7 +25,7 @@ export function TemplateCanvas() {
   const layout = useCurrentLayout();
   const aspectRatio = useCurrentAspectRatio();
   const style = useEditorStore((s) => s.style);
-  const texts = useEditorStore((s) => s.texts);
+  const elements = useEditorStore((s) => s.elements);
   const clearSelection = useEditorStore((s) => s.clearSelection);
   const isCropping = useUiStore((s) => s.cropRect !== null);
 
@@ -58,6 +58,7 @@ export function TemplateCanvas() {
           style={canvasSize}
         >
           <div
+            data-canvas
             className="absolute inset-0 overflow-hidden shadow-2xl ring-1 shadow-black/60 ring-white/10"
             style={{
               backgroundColor: style.backgroundColor,
@@ -76,8 +77,13 @@ export function TemplateCanvas() {
             <LayoutDividers canvasSize={canvasSize} padding={style.padding * unit} />
 
             <div className="pointer-events-none absolute inset-0 z-20">
-              {texts.map((text) => (
-                <TextOverlayItem key={text.id} text={text} unit={unit} canvasSize={canvasSize} />
+              {elements.map((element) => (
+                <ElementView
+                  key={element.id}
+                  element={element}
+                  unit={unit}
+                  canvasSize={canvasSize}
+                />
               ))}
             </div>
           </div>
