@@ -1,8 +1,8 @@
 import { MAX_ZOOM } from '@/constants/editor';
-import type { CellImage, ImageTransform, PixelRect, Size } from '@/types';
+import type { CellMedia, ImageTransform, PixelRect, Size } from '@/types';
 import { clamp } from './math';
 
-export const getImageSize = (image: Pick<CellImage, 'naturalWidth' | 'naturalHeight'>): Size => ({
+export const getImageSize = (image: Pick<CellMedia, 'naturalWidth' | 'naturalHeight'>): Size => ({
   width: image.naturalWidth,
   height: image.naturalHeight,
 });

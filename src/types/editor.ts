@@ -10,9 +10,9 @@ export interface AspectRatio {
 }
 
 /**
- * How an image sits inside its cell.
- * - `scale` is relative to "cover" (1 = image exactly fills the cell).
- * - `offsetX` / `offsetY` move the image centre, as a fraction of the cell's width / height.
+ * How media sits inside its cell.
+ * - `scale` is relative to "cover" (1 = media exactly fills the cell).
+ * - `offsetX` / `offsetY` move the centre, as a fraction of the cell's width / height.
  */
 export interface ImageTransform {
   scale: number;
@@ -20,12 +20,23 @@ export interface ImageTransform {
   offsetY: number;
 }
 
-export interface CellImage {
+export type MediaKind = 'image' | 'video';
+
+/** An image or video placed in a cell. */
+export interface CellMedia {
   id: string;
+  kind: MediaKind;
+  /** Object URL for previewing. */
   src: string;
+  /** Original file; video export decodes frames and audio from it. */
+  file: File;
   fileName: string;
   naturalWidth: number;
   naturalHeight: number;
+  /** Length in seconds (0 for images). */
+  duration: number;
+  /** Timeline time in seconds when this item appears in its cell. */
+  start: number;
   transform: ImageTransform;
 }
 
@@ -62,13 +73,15 @@ export interface TextOverlay {
 
 export type Selection = { kind: 'cell'; index: number } | { kind: 'text'; id: string } | null;
 
-export type ExportFormat = 'png' | 'jpeg';
+export type ExportFormat = 'png' | 'jpeg' | 'mp4';
 
 export interface ExportOptions {
   format: ExportFormat;
-  /** Resolution multiplier applied to the design size. */
+  /** Resolution multiplier for still images. */
   scale: number;
   /** JPEG quality, 0–1. */
   quality: number;
+  /** Output width in pixels for MP4 export. */
+  videoWidth: number;
   fileName: string;
 }

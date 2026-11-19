@@ -15,13 +15,16 @@ Images stay in your browser. Nothing is uploaded to a server.
 - Gap, outer border, corner radius and background color
 - Text layers with anime-style fonts, outline and shadow; drag to position
 - Export as PNG or JPG at 1×, 1.5× or 2× resolution. Download, copy to clipboard, or share (mobile)
+- **Video:** put videos in any cell, next to images or other videos, with the same pan and zoom
+- **Timeline:** play, pause, scrub and step frame by frame. Schedule images or videos to appear in a cell at an exact moment (e.g. manga panels synced to an anime clip)
+- **MP4 export** (H.264, 30 fps, 720p or 1080p) with the original sound of a chosen video. Encoded on the device with WebCodecs; nothing is uploaded
 - Responsive: sidebar on tablet and desktop, bottom tabs on phones
-- Keyboard: `Delete` removes the selection, `Esc` clears it
+- Keyboard: `Space` plays or pauses, `Delete` removes the selection, `Esc` clears it
 
 ## Roadmap
 
-- Video in cells, a timeline to show images at set times, and MP4 export with the clip's original audio
 - Mixing audio from several clips
+- Trimming video start and end
 - Layers
 
 ## Branches
@@ -44,7 +47,7 @@ npm run lint
 
 ## Tech
 
-React 18 · TypeScript (strict) · Vite · Tailwind CSS v4 · Zustand · @use-gesture/react · lucide-react
+React 18 · TypeScript (strict) · Vite · Tailwind CSS v4 · Zustand · @use-gesture/react · lucide-react · Mediabunny (MP4 encoding, loaded only when exporting video)
 
 ## Project structure
 
@@ -79,3 +82,5 @@ src/
 - **Design units.** Every canvas is 1080 units wide. Gap, radius and font sizes are stored in these units. The preview multiplies them by the on-screen scale, and the export multiplies them by the export scale. This keeps the preview and the downloaded image the same.
 - **Image transforms** are stored relative to the cell (`scale` relative to "cover", offsets as a fraction of the cell size). They still work after the layout, canvas size or gap changes.
 - **Export** draws everything onto an HTML canvas with the same math as the preview (`utils/renderToCanvas.ts`). It does not take a screenshot of the DOM, so the output is sharp and in the right place.
+- **Timeline.** Each cell holds a list of items sorted by start time, and shows the latest one that has started (`utils/timeline.ts`). In the preview, the video that provides the sound is the playback clock, so pictures stay in sync with the audio (`hooks/useVideoSync.ts`, `hooks/usePlaybackLoop.ts`).
+- **Video export** (`utils/videoExport.ts`) decodes the exact frame each video needs for every output frame, draws it with the same `drawTemplate` function, encodes H.264 with WebCodecs, and muxes the original audio. This makes the output frame-accurate, unlike recording the screen.

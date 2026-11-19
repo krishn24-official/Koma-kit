@@ -2,6 +2,7 @@ import { Download, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useExport } from '@/hooks/useExport';
 import { useEditorStore } from '@/store/useEditorStore';
+import { usePlaybackStore } from '@/store/usePlaybackStore';
 import { Logo } from './Logo';
 
 export function Header() {
@@ -9,7 +10,10 @@ export function Header() {
   const { download, busy } = useExport();
 
   const handleReset = () => {
-    if (window.confirm('Start over? All images and text will be removed.')) resetProject();
+    if (!window.confirm('Start over? All images, videos and text will be removed.')) return;
+    usePlaybackStore.getState().pause();
+    usePlaybackStore.getState().seek(0);
+    resetProject();
   };
 
   return (

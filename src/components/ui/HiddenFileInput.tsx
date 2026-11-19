@@ -1,18 +1,21 @@
 import { forwardRef } from 'react';
+import { ACCEPTED_MEDIA } from '@/utils/media';
 
 interface HiddenFileInputProps {
   multiple?: boolean;
+  /** Defaults to images and videos. */
+  accept?: string;
   onFiles: (files: File[]) => void;
 }
 
-/** Hidden image picker. Open it with `ref.current?.click()`. */
+/** Hidden file picker. Open it with `ref.current?.click()`. */
 export const HiddenFileInput = forwardRef<HTMLInputElement, HiddenFileInputProps>(
-  function HiddenFileInput({ multiple = false, onFiles }, ref) {
+  function HiddenFileInput({ multiple = false, accept = ACCEPTED_MEDIA, onFiles }, ref) {
     return (
       <input
         ref={ref}
         type="file"
-        accept="image/*"
+        accept={accept}
         multiple={multiple}
         hidden
         onChange={(e) => {

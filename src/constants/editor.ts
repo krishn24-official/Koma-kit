@@ -70,16 +70,33 @@ export const EXPORT_SCALES = [
 export const EXPORT_MIME: Record<ExportFormat, string> = {
   png: 'image/png',
   jpeg: 'image/jpeg',
+  mp4: 'video/mp4',
 };
 
 export const EXPORT_EXTENSION: Record<ExportFormat, string> = {
   png: 'png',
   jpeg: 'jpg',
+  mp4: 'mp4',
 };
+
+export const VIDEO_WIDTHS = [
+  { value: 720, label: '720p' },
+  { value: 1080, label: '1080p' },
+] as const;
+
+export const VIDEO_FPS = 30;
+export const FRAME_DURATION = 1 / VIDEO_FPS;
+
+/** X rejects longer videos for most accounts. */
+export const X_MAX_VIDEO_SECONDS = 140;
+
+/** How long a scheduled image stays on screen after the last video ends. */
+export const IMAGE_TAIL_SECONDS = 2;
 
 export const DEFAULT_EXPORT_OPTIONS: ExportOptions = {
   format: 'png',
   scale: 2,
   quality: 0.92,
+  videoWidth: 1080,
   fileName: 'koma-kit-template',
 };

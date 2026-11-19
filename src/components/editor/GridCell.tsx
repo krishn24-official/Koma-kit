@@ -1,10 +1,13 @@
 import { ArrowLeftRight } from 'lucide-react';
 import { useRef, useState, type DragEvent } from 'react';
 import { HiddenFileInput } from '@/components/ui/HiddenFileInput';
-import { useImageUpload } from '@/hooks/useImageUpload';
+import { useMediaUpload } from '@/hooks/useMediaUpload';
+import { useActiveItem } from '@/store/selectors';
 import { useEditorStore } from '@/store/useEditorStore';
 import type { PixelRect } from '@/types';
+import { formatTime } from '@/utils/timeline';
 import { CellImageView } from './CellImageView';
+import { CellVideoView } from './CellVideoView';
 import { EmptyCell } from './EmptyCell';
 
 interface GridCellProps {
@@ -14,19 +17,21 @@ interface GridCellProps {
 }
 
 export function GridCell({ index, rect, radius }: GridCellProps) {
-  const image = useEditorStore((s) => s.images[index]);
+  const items = useEditorStore((s) => s.cells[index]);
+  const item = useActiveItem(index);
   const isSelected = useEditorStore(
     (s) => s.selection?.kind === 'cell' && s.selection.index === index,
   );
   const swapSource = useEditorStore((s) => s.swapSource);
   const select = useEditorStore((s) => s.select);
   const swapCells = useEditorStore((s) => s.swapCells);
-  const { uploadToCell } = useImageUpload();
+  const { uploadToCell } = useMediaUpload();
 
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
 
   const isSwapTarget = swapSource !== null && swapSource !== index;
+  const upcoming = !item && items?.[0] ? items[0] : null;
 
   const handlePointerDown = () => {
     if (swapSource !== null && swapSource !== index) {
@@ -51,6 +56,7 @@ export function GridCell({ index, rect, radius }: GridCellProps) {
   };
 
   const showRing = isSelected || isDragOver || swapSource === index;
+  const size = { width: rect.width, height: rect.height };
 
   return (
     <div
@@ -67,14 +73,20 @@ export function GridCell({ index, rect, radius }: GridCellProps) {
       onDragLeave={() => setIsDragOver(false)}
       onDrop={handleDrop}
     >
-      {image ? (
-        <CellImageView index={index} image={image} size={rect} />
-      ) : (
+      {item?.kind === 'video' && (
+        <CellVideoView key={item.id} index={index} item={item} size={size} />
+      )}
+      {item?.kind === 'image' && (
+        <CellImageView key={item.id} index={index} item={item} size={size} />
+      )}
+      {!item && (
         <EmptyCell
           compact={rect.width < 90 || rect.height < 70}
           highlighted={isDragOver}
+          upcomingLabel={upcoming ? `Starts at ${formatTime(upcoming.start)}` : undefined}
           onClick={() => {
-            if (!isSwapTarget) inputRef.current?.click();
+            // Cells with something scheduled later just get selected (pointer down).
+            if (!isSwapTarget && !upcoming) inputRef.current?.click();
           }}
         />
       )}

@@ -1,11 +1,11 @@
 import { useState, type DragEvent } from 'react';
-import { useImageUpload } from '@/hooks/useImageUpload';
+import { useMediaUpload } from '@/hooks/useMediaUpload';
 import { cn } from '@/utils/cn';
 import { TemplateCanvas } from './TemplateCanvas';
 
 /** Area around the canvas. Files dropped here fill empty cells in order. */
 export function Workspace() {
-  const { uploadMany } = useImageUpload();
+  const { uploadMany } = useMediaUpload();
   const [isDragOver, setIsDragOver] = useState(false);
 
   const handleDragOver = (e: DragEvent) => {

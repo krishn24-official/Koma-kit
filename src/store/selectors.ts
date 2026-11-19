@@ -1,9 +1,12 @@
 import { useMemo } from 'react';
 import { getAspectRatio } from '@/constants/aspectRatios';
 import { getLayout } from '@/constants/layouts';
-import type { AspectRatio, LayoutPreset, PixelRect, TextOverlay } from '@/types';
+import type { AspectRatio, CellMedia, LayoutPreset, PixelRect, TextOverlay } from '@/types';
 import { getCellRects } from '@/utils/layoutMath';
+import type { TemplateSnapshot } from '@/utils/renderToCanvas';
+import { getActiveItemIndex, getTimelineDuration } from '@/utils/timeline';
 import { useEditorStore } from './useEditorStore';
+import { usePlaybackStore } from './usePlaybackStore';
 
 export const useCurrentLayout = (): LayoutPreset => getLayout(useEditorStore((s) => s.layoutId));
 
@@ -17,12 +20,35 @@ export const useSelectedText = (): TextOverlay | null =>
     return s.texts.find((t) => t.id === selection.id) ?? null;
   });
 
-/** Number of visible cells that have an image. */
+/** Number of visible cells that have at least one item. */
 export const useFilledCellCount = (): number => {
   const cellCount = useCurrentLayout().cells.length;
   return useEditorStore(
-    (s) => Object.keys(s.images).filter((key) => Number(key) < cellCount).length,
+    (s) => Object.keys(s.cells).filter((key) => Number(key) < cellCount).length,
   );
+};
+
+/** Timeline length in seconds; 0 when the template has no video or scheduled images. */
+export const useTimelineDuration = (): number => {
+  const cellCount = useCurrentLayout().cells.length;
+  return useEditorStore((s) => getTimelineDuration(s.cells, cellCount));
+};
+
+/** True if any visible cell holds a video. */
+export const useHasVideo = (): boolean => {
+  const cellCount = useCurrentLayout().cells.length;
+  return useEditorStore((s) =>
+    Object.entries(s.cells).some(
+      ([key, items]) => Number(key) < cellCount && items.some((item) => item.kind === 'video'),
+    ),
+  );
+};
+
+/** The item a cell is showing at the current playhead. Re-renders only when it changes. */
+export const useActiveItem = (index: number): CellMedia | null => {
+  const items = useEditorStore((s) => s.cells[index]);
+  const activeIndex = usePlaybackStore((s) => getActiveItemIndex(items, s.currentTime));
+  return activeIndex >= 0 ? (items?.[activeIndex] ?? null) : null;
 };
 
 /**
@@ -38,3 +64,16 @@ export const useDesignCellRects = (): PixelRect[] => {
     [layout, aspectRatio, style],
   );
 };
+
+/** Everything the exporters need, read once at export time (not a hook). */
+export function getTemplateSnapshot(): TemplateSnapshot {
+  const s = useEditorStore.getState();
+  return {
+    layout: getLayout(s.layoutId),
+    aspectRatio: getAspectRatio(s.aspectRatioId),
+    style: s.style,
+    cells: s.cells,
+    texts: s.texts,
+    audioSourceId: s.audioSourceId,
+  };
+}

@@ -6,21 +6,27 @@ import type { ImageTransform, Size } from '@/types';
 import { clampTransform, getImageSize } from '@/utils/imageTransform';
 
 /**
- * Pan (drag), pinch-zoom (touch / trackpad) and wheel-zoom for an image inside a cell.
+ * Pan (drag), pinch-zoom (touch / trackpad) and wheel-zoom for one item in a cell.
  * Reads the latest transform from the store on every event, so fast gestures never
  * work from stale values.
  */
-export function useCellGestures(ref: RefObject<HTMLElement>, index: number, cellSize: Size) {
+export function useCellGestures(
+  ref: RefObject<HTMLElement>,
+  index: number,
+  itemId: string,
+  cellSize: Size,
+) {
   const sizeRef = useRef(cellSize);
   sizeRef.current = cellSize;
 
-  const getImage = () => useEditorStore.getState().images[index];
+  const getItem = () =>
+    useEditorStore.getState().cells[index]?.find((item) => item.id === itemId);
 
   const apply = (update: (t: ImageTransform) => ImageTransform) => {
-    const image = getImage();
-    if (!image) return;
-    const next = clampTransform(update(image.transform), getImageSize(image), sizeRef.current);
-    useEditorStore.getState().updateCellTransform(index, next);
+    const item = getItem();
+    if (!item) return;
+    const next = clampTransform(update(item.transform), getImageSize(item), sizeRef.current);
+    useEditorStore.getState().updateItemTransform(index, itemId, next);
   };
 
   useGesture(
@@ -44,7 +50,7 @@ export function useCellGestures(ref: RefObject<HTMLElement>, index: number, cell
       drag: { filterTaps: true },
       pinch: {
         // Start each pinch from the current zoom so it continues smoothly.
-        from: () => [getImage()?.transform.scale ?? 1, 0],
+        from: () => [getItem()?.transform.scale ?? 1, 0],
         rubberband: false,
       },
     },
