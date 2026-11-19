@@ -1,0 +1,119 @@
+import { ArrowLeftRight } from 'lucide-react';
+import { useRef, useState, type DragEvent } from 'react';
+import { HiddenFileInput } from '@/components/ui/HiddenFileInput';
+import { useMediaUpload } from '@/hooks/useMediaUpload';
+import { useActiveItem } from '@/store/selectors';
+import { useEditorStore } from '@/store/useEditorStore';
+import type { PixelRect } from '@/types';
+import { boxFadeCss } from '@/utils/background';
+import { formatTime } from '@/utils/timeline';
+import { CellImageView } from './CellImageView';
+import { CellVideoView } from './CellVideoView';
+import { EmptyCell } from './EmptyCell';
+
+interface GridCellProps {
+  index: number;
+  rect: PixelRect;
+  radius: number;
+}
+
+export function GridCell({ index, rect, radius }: GridCellProps) {
+  const items = useEditorStore((s) => s.cells[index]);
+  const item = useActiveItem(index);
+  const isSelected = useEditorStore(
+    (s) => s.selection?.kind === 'cell' && s.selection.index === index,
+  );
+  const swapSource = useEditorStore((s) => s.swapSource);
+  const fade = useEditorStore((s) => s.boxFades[index]);
+  const select = useEditorStore((s) => s.select);
+  const swapCells = useEditorStore((s) => s.swapCells);
+  const { uploadToCell } = useMediaUpload();
+
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const isSwapTarget = swapSource !== null && swapSource !== index;
+  const upcoming = !item && items?.[0] ? items[0] : null;
+
+  const handlePointerDown = () => {
+    if (swapSource !== null && swapSource !== index) {
+      swapCells(swapSource, index);
+      return;
+    }
+    select({ kind: 'cell', index });
+  };
+
+  const handleDragOver = (e: DragEvent) => {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  };
+
+  const handleDrop = (e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+    void uploadToCell(index, Array.from(e.dataTransfer.files));
+  };
+
+  const showRing = isSelected || isDragOver || swapSource === index;
+  const size = { width: rect.width, height: rect.height };
+
+  return (
+    <div
+      className="absolute overflow-hidden"
+      style={{
+        left: rect.x,
+        top: rect.y,
+        width: rect.width,
+        height: rect.height,
+        borderRadius: radius,
+      }}
+      onPointerDown={handlePointerDown}
+      onDragOver={handleDragOver}
+      onDragLeave={() => setIsDragOver(false)}
+      onDrop={handleDrop}
+    >
+      {item?.kind === 'video' && (
+        <CellVideoView key={item.id} index={index} item={item} size={size} />
+      )}
+      {item?.kind === 'image' && (
+        <CellImageView key={item.id} index={index} item={item} size={size} />
+      )}
+      {!item && (
+        <EmptyCell
+          compact={rect.width < 90 || rect.height < 70}
+          highlighted={isDragOver}
+          upcomingLabel={upcoming ? `Starts at ${formatTime(upcoming.start)}` : undefined}
+          onClick={() => {
+            // Cells with something scheduled later just get selected (pointer down).
+            if (!isSwapTarget && !upcoming) inputRef.current?.click();
+          }}
+        />
+      )}
+
+      {fade && (
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{ background: boxFadeCss(fade) }}
+        />
+      )}
+
+      {isSwapTarget && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-brand-500/30 text-white">
+          <ArrowLeftRight className="size-6 drop-shadow" aria-hidden />
+        </div>
+      )}
+
+      {showRing && (
+        <div
+          className="pointer-events-none absolute inset-0 ring-2 ring-brand-500 ring-inset"
+          style={{ borderRadius: radius }}
+        />
+      )}
+
+      <HiddenFileInput ref={inputRef} multiple onFiles={(files) => uploadToCell(index, files)} />
+    </div>
+  );
+}

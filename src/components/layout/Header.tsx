@@ -1,0 +1,39 @@
+import { Download, RotateCcw } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { useEditorStore } from '@/store/useEditorStore';
+import { usePlaybackStore } from '@/store/usePlaybackStore';
+import { useUiStore } from '@/store/useUiStore';
+import { Logo } from './Logo';
+
+export function Header() {
+  const resetProject = useEditorStore((s) => s.resetProject);
+  const openDownload = useUiStore((s) => s.setDownloadDialogOpen);
+
+  const handleReset = () => {
+    if (!window.confirm('Start over? All images, videos and text will be removed.')) return;
+    usePlaybackStore.getState().pause();
+    usePlaybackStore.getState().seek(0);
+    resetProject();
+  };
+
+  return (
+    <header className="flex h-14 shrink-0 items-center justify-between border-b border-neutral-800 px-3 sm:px-5">
+      <Logo />
+      <div className="flex items-center gap-2">
+        <Button variant="ghost" size="sm" icon={<RotateCcw />} onClick={handleReset}>
+          <span className="hidden sm:inline">Reset</span>
+          <span className="sr-only sm:hidden">Reset</span>
+        </Button>
+        <Button
+          variant="primary"
+          size="sm"
+          icon={<Download />}
+          aria-haspopup="dialog"
+          onClick={() => openDownload(true)}
+        >
+          Download
+        </Button>
+      </div>
+    </header>
+  );
+}
