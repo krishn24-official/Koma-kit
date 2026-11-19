@@ -36,6 +36,7 @@ interface UiStore {
   setStickerCrop: (crop: { id: string; rect: CellRect } | null) => void;
   setVideoExport: (state: VideoExportProgress | null) => void;
   toggleMobilePanel: (id: PanelId) => void;
+  closeMobilePanel: () => void;
   showToast: (message: string, tone?: ToastTone) => void;
   dismissToast: () => void;
 }
@@ -63,6 +64,8 @@ export const useUiStore = create<UiStore>()((set) => ({
         ? { mobilePanelOpen: false }
         : { activePanel: id, mobilePanelOpen: true },
     ),
+
+  closeMobilePanel: () => set({ mobilePanelOpen: false }),
 
   showToast: (message, tone = 'info') => set({ toast: { id: ++toastId, message, tone } }),
   dismissToast: () => set({ toast: null }),
