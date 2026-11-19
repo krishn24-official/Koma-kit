@@ -8,6 +8,7 @@ import type {
   Size,
   TextOverlay,
 } from '@/types';
+import { drawBackground } from './background';
 import { getImageRect, getImageSize } from './imageTransform';
 import { getCellRects } from './layoutMath';
 import { loadImage, loadVideoFrame, releaseVideo } from './media';
@@ -40,6 +41,14 @@ function traceRoundedRect(ctx: CanvasRenderingContext2D, rect: PixelRect, radius
   ctx.arcTo(x, y + h, x, y, r);
   ctx.arcTo(x, y, x + w, y, r);
   ctx.closePath();
+}
+
+/** Loads the background picture if the template uses one. */
+export async function loadBackgroundImage(
+  snapshot: TemplateSnapshot,
+): Promise<HTMLImageElement | null> {
+  const { backgroundType, backgroundImage } = snapshot.style;
+  return backgroundType === 'image' && backgroundImage ? loadImage(backgroundImage.src) : null;
 }
 
 /** Makes sure web fonts are ready; canvas silently falls back otherwise. */
@@ -109,15 +118,16 @@ export function drawTemplate(
   size: Size,
   time: number,
   resolve: MediaResolver,
+  /** Loaded background picture, when the background type is "image". */
+  backgroundImage: CanvasImageSource | null = null,
 ): void {
   const { layout, aspectRatio, style, cells, texts } = snapshot;
   const unit = size.width / aspectRatio.width;
   const rects = getCellRects(layout.cells, size, style, unit);
 
-  ctx.fillStyle = style.backgroundColor;
-  ctx.fillRect(0, 0, size.width, size.height);
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
+  drawBackground(ctx, style, size, unit, backgroundImage);
 
   rects.forEach((rect, i) => {
     const item = getActiveItem(cells[i], time);
@@ -162,10 +172,14 @@ export async function renderStill(
 
   const sources = new Map<string, CanvasImageSource>();
   const videos: HTMLVideoElement[] = [];
+  let background: CanvasImageSource | null = null;
 
   try {
     await Promise.all([
       loadTextFonts(snapshot.texts),
+      loadBackgroundImage(snapshot).then((img) => {
+        background = img;
+      }),
       ...active.map(async (item) => {
         if (item.kind === 'image') {
           sources.set(item.id, await loadImage(item.src));
@@ -177,7 +191,14 @@ export async function renderStill(
       }),
     ]);
 
-    drawTemplate(ctx, snapshot, { width, height }, time, (item) => sources.get(item.id) ?? null);
+    drawTemplate(
+      ctx,
+      snapshot,
+      { width, height },
+      time,
+      (item) => sources.get(item.id) ?? null,
+      background,
+    );
     return canvas;
   } finally {
     videos.forEach(releaseVideo);

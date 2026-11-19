@@ -26,7 +26,12 @@ import {
 } from 'mediabunny';
 import type { CellMedia } from '@/types';
 import { loadImage } from './media';
-import { drawTemplate, loadTextFonts, type TemplateSnapshot } from './renderToCanvas';
+import {
+  drawTemplate,
+  loadBackgroundImage,
+  loadTextFonts,
+  type TemplateSnapshot,
+} from './renderToCanvas';
 import {
   getActiveItem,
   getPlayLength,
@@ -104,12 +109,13 @@ export async function exportVideo(
 
   try {
     // Images and fonts are loaded once up front.
-    const [images] = await Promise.all([
+    const [images, background] = await Promise.all([
       Promise.all(
         visibleItems
           .filter((item) => item.kind === 'image')
           .map(async (item) => [item.id, await loadImage(item.src)] as const),
       ).then((entries) => new Map(entries)),
+      loadBackgroundImage(snapshot),
       loadTextFonts(snapshot.texts),
     ]);
 
@@ -195,10 +201,16 @@ export async function exportVideo(
           if (!next.done && next.value) reader.current = next.value.canvas;
         }
 
-        drawTemplate(ctx, snapshot, size, t, (item) =>
-          item.kind === 'image'
-            ? (images.get(item.id) ?? null)
-            : (readers.get(item.id)?.current ?? null),
+        drawTemplate(
+          ctx,
+          snapshot,
+          size,
+          t,
+          (item) =>
+            item.kind === 'image'
+              ? (images.get(item.id) ?? null)
+              : (readers.get(item.id)?.current ?? null),
+          background,
         );
         await videoSource.add(t, 1 / fps);
         options.onProgress((f + 1) / frameCount);

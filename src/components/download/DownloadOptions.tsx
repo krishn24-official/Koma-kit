@@ -5,6 +5,7 @@ import { Field, TextInput } from '@/components/ui/Field';
 import { PanelSection } from '@/components/ui/PanelSection';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Slider } from '@/components/ui/Slider';
+import { getExactScale } from '@/constants/canvasSizes';
 import { EXPORT_SCALES, VIDEO_FPS, VIDEO_WIDTHS, X_MAX_VIDEO_SECONDS } from '@/constants/editor';
 import { canCopyImage, canShareFiles, useExport } from '@/hooks/useExport';
 import {
@@ -34,11 +35,18 @@ function Note({ tone = 'info', children }: { tone?: 'info' | 'warn'; children: R
   );
 }
 
-export function ExportPanel() {
+interface DownloadOptionsProps {
+  /** Called after a download, copy or share finishes (e.g. to close the dialog). */
+  onDone?: () => void;
+}
+
+/** Format, resolution and file name, plus the Download / Copy / Share buttons. */
+export function DownloadOptions({ onDone }: DownloadOptionsProps) {
   const options = useEditorStore((s) => s.exportOptions);
   const updateOptions = useEditorStore((s) => s.updateExportOptions);
   const hasAudio = useEditorStore((s) => s.audioSourceId !== null);
   const aspectRatio = useCurrentAspectRatio();
+  const canvasSize = useEditorStore((s) => s.canvasSize);
   const emptyCells = useCurrentLayout().cells.length - useFilledCellCount();
   const duration = useTimelineDuration();
   const hasTimeline = duration > 0;
@@ -55,11 +63,16 @@ export function ExportPanel() {
     ...(hasTimeline ? [{ value: 'mp4' as const, label: 'MP4', hint: 'Video' }] : []),
   ];
 
-  const scaleOptions = EXPORT_SCALES.map((s) => ({
-    value: s.value,
-    label: s.label,
-    hint: `${Math.round(aspectRatio.width * s.value)}×${Math.round(aspectRatio.height * s.value)}`,
-  }));
+  const pixels = (scale: number) =>
+    `${Math.round(aspectRatio.width * scale)}×${Math.round(aspectRatio.height * scale)}`;
+  const exactScale = getExactScale(canvasSize);
+  const scaleOptions = [
+    // Platform and typed sizes get their exact pixels as the first choice.
+    ...(canvasSize.exact && !EXPORT_SCALES.some((s) => s.value === exactScale)
+      ? [{ value: exactScale, label: 'Exact', hint: pixels(exactScale) }]
+      : []),
+    ...EXPORT_SCALES.map((s) => ({ value: s.value, label: s.label, hint: pixels(s.value) })),
+  ];
 
   const videoOptions = VIDEO_WIDTHS.map((w) => ({
     value: w.value,
@@ -153,9 +166,9 @@ export function ExportPanel() {
           fullWidth
           icon={<Download />}
           loading={busy === 'download'}
-          onClick={download}
+          onClick={() => void download().then(onDone)}
         >
-          {isVideo ? 'Create & download video' : 'Download'}
+          {isVideo ? 'Create & download video' : `Download ${format === 'jpeg' ? 'JPG' : 'PNG'}`}
         </Button>
         {((capabilities.copy && !isVideo) || capabilities.share) && (
           <div className="grid grid-cols-2 gap-2">
@@ -163,7 +176,7 @@ export function ExportPanel() {
               <Button
                 icon={<Copy />}
                 loading={busy === 'copy'}
-                onClick={copy}
+                onClick={() => void copy().then(onDone)}
                 className={capabilities.share ? undefined : 'col-span-2'}
               >
                 Copy
@@ -173,7 +186,7 @@ export function ExportPanel() {
               <Button
                 icon={<Share2 />}
                 loading={busy === 'share'}
-                onClick={share}
+                onClick={() => void share().then(onDone)}
                 className={capabilities.copy && !isVideo ? undefined : 'col-span-2'}
               >
                 Share

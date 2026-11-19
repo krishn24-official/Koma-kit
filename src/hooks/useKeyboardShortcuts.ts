@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useEditorStore } from '@/store/useEditorStore';
 import { getCurrentDuration, usePlaybackStore } from '@/store/usePlaybackStore';
+import { useUiStore } from '@/store/useUiStore';
 import { getActiveItem } from '@/utils/timeline';
 
 const isTypingTarget = (target: EventTarget | null) =>
@@ -15,6 +16,12 @@ export function useKeyboardShortcuts() {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (isTypingTarget(event.target)) return;
+
+      // While cropping, only Escape (cancel) does anything.
+      if (useUiStore.getState().cropRect) {
+        if (event.key === 'Escape') useUiStore.getState().setCropRect(null);
+        return;
+      }
       const { selection, cells, removeItem, removeText, clearSelection } =
         useEditorStore.getState();
 

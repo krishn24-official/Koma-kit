@@ -12,8 +12,29 @@ export const DEFAULT_STYLE: CanvasStyle = {
   gap: 8,
   padding: 0,
   radius: 0,
+  backgroundType: 'solid',
   backgroundColor: '#0a0a0a',
+  gradientFrom: '#7c3aed',
+  gradientTo: '#e11d48',
+  gradientAngle: 135,
+  backgroundImage: null,
+  backgroundBlur: 12,
+  backgroundDim: 0.25,
 };
+
+export const GRADIENT_PRESETS = [
+  { name: 'Sunset', from: '#f97316', to: '#db2777' },
+  { name: 'Neon', from: '#7c3aed', to: '#e11d48' },
+  { name: 'Ocean', from: '#0ea5e9', to: '#1e3a8a' },
+  { name: 'Sakura', from: '#fbcfe8', to: '#f472b6' },
+  { name: 'Night', from: '#0f172a', to: '#4c1d95' },
+  { name: 'Fire', from: '#facc15', to: '#dc2626' },
+] as const;
+
+export const BACKGROUND_LIMITS = {
+  blur: { min: 0, max: 40 },
+  dim: { min: 0, max: 0.8 },
+} as const;
 
 export const STYLE_LIMITS = {
   gap: { min: 0, max: 60 },

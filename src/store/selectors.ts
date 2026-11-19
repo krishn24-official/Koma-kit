@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { getAspectRatio } from '@/constants/aspectRatios';
+import { toDesignSize } from '@/constants/canvasSizes';
 import type { AspectRatio, CellMedia, PixelRect, ResolvedLayout, TextOverlay } from '@/types';
 import { getCellRects } from '@/utils/layoutMath';
 import { resolveLayout } from '@/utils/layoutTree';
@@ -12,8 +12,11 @@ import { usePlaybackStore } from './usePlaybackStore';
 export const useCurrentLayout = (): ResolvedLayout =>
   resolveLayout(useEditorStore((s) => s.layoutRoot));
 
-export const useCurrentAspectRatio = (): AspectRatio =>
-  getAspectRatio(useEditorStore((s) => s.aspectRatioId));
+/** Canvas size in design units (1080 wide). Stable while the canvas size is unchanged. */
+export const useCurrentAspectRatio = (): AspectRatio => {
+  const canvasSize = useEditorStore((s) => s.canvasSize);
+  return useMemo(() => toDesignSize(canvasSize), [canvasSize]);
+};
 
 export const useSelectedText = (): TextOverlay | null =>
   useEditorStore((s) => {
@@ -72,7 +75,7 @@ export function getTemplateSnapshot(): TemplateSnapshot {
   const s = useEditorStore.getState();
   return {
     layout: resolveLayout(s.layoutRoot),
-    aspectRatio: getAspectRatio(s.aspectRatioId),
+    aspectRatio: toDesignSize(s.canvasSize),
     style: s.style,
     cells: s.cells,
     texts: s.texts,

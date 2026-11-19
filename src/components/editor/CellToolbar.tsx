@@ -1,11 +1,14 @@
 import {
   ArrowLeftRight,
   CalendarClock,
+  Check,
+  Crop as CropIcon,
   Expand,
   ImagePlus,
   MapPin,
   Plus,
   RefreshCw,
+  Scan,
   Scissors,
   Shrink,
   Trash2,
@@ -21,10 +24,13 @@ import { HiddenFileInput } from '@/components/ui/HiddenFileInput';
 import { IconButton } from '@/components/ui/IconButton';
 import { Slider } from '@/components/ui/Slider';
 import { DEFAULT_TRANSFORM } from '@/constants/editor';
+import { useCrop } from '@/hooks/useCrop';
+import { useFitToPictures } from '@/hooks/useFitToPictures';
 import { useMediaUpload } from '@/hooks/useMediaUpload';
 import { useActiveItem, useDesignCellRects, useTimelineDuration } from '@/store/selectors';
 import { useEditorStore } from '@/store/useEditorStore';
 import { usePlaybackStore } from '@/store/usePlaybackStore';
+import { useUiStore } from '@/store/useUiStore';
 import type { CellMedia, ImageTransform, PixelRect } from '@/types';
 import {
   clampTransform,
@@ -55,6 +61,7 @@ function MediaControls({ index, item, cellRect }: MediaControlsProps) {
   const isAudioSource = useEditorStore((s) => s.audioSourceId === item.id);
   const setAudioSource = useEditorStore((s) => s.setAudioSource);
   const { replaceInCell } = useMediaUpload();
+  const { start: startCrop } = useCrop();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const mediaSize = getImageSize(item);
@@ -103,6 +110,7 @@ function MediaControls({ index, item, cellRect }: MediaControlsProps) {
             onClick={() => setAudioSource(isAudioSource ? null : item.id)}
           />
         )}
+        <IconButton label="Crop canvas" icon={<CropIcon />} onClick={startCrop} />
         <IconButton
           label="Fit whole picture"
           icon={<Shrink />}
@@ -280,10 +288,30 @@ export function CellToolbar() {
   const cancelSwap = useEditorStore((s) => s.cancelSwap);
   const removeText = useEditorStore((s) => s.removeText);
   const addLayer = useEditorStore((s) => s.addLayer);
+  const fitToPictures = useFitToPictures();
+  const isCropping = useUiStore((s) => s.cropRect !== null);
+  const crop = useCrop();
 
   let content: ReactNode;
 
-  if (swapSource !== null) {
+  if (isCropping) {
+    content = (
+      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
+        <Hint>Drag the edges or corners. They snap to your pictures.</Hint>
+        <div className="flex gap-2">
+          <Button size="sm" variant="ghost" onClick={crop.reset}>
+            Reset
+          </Button>
+          <Button size="sm" onClick={crop.cancel}>
+            Cancel
+          </Button>
+          <Button size="sm" variant="primary" icon={<Check />} onClick={crop.apply}>
+            Apply crop
+          </Button>
+        </div>
+      </div>
+    );
+  } else if (swapSource !== null) {
     content = (
       <div className="flex items-center gap-3">
         <Hint>Tap another cell to swap with cell {swapSource + 1}</Hint>
@@ -309,10 +337,18 @@ export function CellToolbar() {
   } else {
     content = (
       <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
-        <Hint>Tap a box to add an image or video · Drag white handles to resize boxes</Hint>
-        <Button size="sm" icon={<Plus />} onClick={addLayer}>
-          Add layer
-        </Button>
+        <Hint>Tap a box to add an image or video · Drag white handles to resize</Hint>
+        <div className="flex flex-wrap justify-center gap-2">
+          <Button size="sm" icon={<Plus />} onClick={addLayer}>
+            Add layer
+          </Button>
+          <Button size="sm" icon={<CropIcon />} onClick={crop.start}>
+            Crop
+          </Button>
+          <Button size="sm" icon={<Scan />} onClick={fitToPictures}>
+            Fit to pictures
+          </Button>
+        </div>
       </div>
     );
   }

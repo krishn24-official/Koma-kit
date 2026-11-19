@@ -2,10 +2,18 @@ import { useMemo, useRef } from 'react';
 import { useContainerSize } from '@/hooks/useContainerSize';
 import { useCurrentAspectRatio, useCurrentLayout } from '@/store/selectors';
 import { useEditorStore } from '@/store/useEditorStore';
+import { useUiStore } from '@/store/useUiStore';
+import { gradientCss } from '@/utils/background';
 import { getCellRects } from '@/utils/layoutMath';
+import { CanvasBackground } from './CanvasBackground';
+import { CanvasResizeHandles } from './CanvasResizeHandles';
+import { CropOverlay } from './CropOverlay';
 import { GridCell } from './GridCell';
 import { LayoutDividers } from './LayoutDividers';
 import { TextOverlayItem } from './TextOverlayItem';
+
+/** Space kept around the canvas for its resize grips. */
+const HANDLE_ROOM = 24;
 
 /**
  * Live preview of the template, scaled to fit the available space.
@@ -19,10 +27,15 @@ export function TemplateCanvas() {
   const style = useEditorStore((s) => s.style);
   const texts = useEditorStore((s) => s.texts);
   const clearSelection = useEditorStore((s) => s.clearSelection);
+  const isCropping = useUiStore((s) => s.cropRect !== null);
 
+  const available = {
+    width: container.width - HANDLE_ROOM * 2,
+    height: container.height - HANDLE_ROOM * 2,
+  };
   const unit =
-    container.width > 0 && container.height > 0
-      ? Math.min(container.width / aspectRatio.width, container.height / aspectRatio.height)
+    available.width > 0 && available.height > 0
+      ? Math.min(available.width / aspectRatio.width, available.height / aspectRatio.height)
       : 0;
   const canvasSize = { width: aspectRatio.width * unit, height: aspectRatio.height * unit };
 
@@ -41,23 +54,39 @@ export function TemplateCanvas() {
     <div ref={containerRef} className="relative h-full w-full">
       {unit > 0 && (
         <div
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 overflow-hidden shadow-2xl ring-1 shadow-black/60 ring-white/10"
-          style={{ ...canvasSize, backgroundColor: style.backgroundColor }}
-          onPointerDown={(e) => {
-            if (e.target === e.currentTarget) clearSelection();
-          }}
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+          style={canvasSize}
         >
-          {rects.map((rect, index) => (
-            <GridCell key={index} index={index} rect={rect} radius={style.radius * unit} />
-          ))}
+          <div
+            className="absolute inset-0 overflow-hidden shadow-2xl ring-1 shadow-black/60 ring-white/10"
+            style={{
+              backgroundColor: style.backgroundColor,
+              backgroundImage: style.backgroundType === 'gradient' ? gradientCss(style) : undefined,
+            }}
+            onPointerDown={(e) => {
+              if (e.target === e.currentTarget) clearSelection();
+            }}
+          >
+            <CanvasBackground style={style} unit={unit} />
 
-          <LayoutDividers canvasSize={canvasSize} padding={style.padding * unit} />
-
-          <div className="pointer-events-none absolute inset-0 z-20">
-            {texts.map((text) => (
-              <TextOverlayItem key={text.id} text={text} unit={unit} canvasSize={canvasSize} />
+            {rects.map((rect, index) => (
+              <GridCell key={index} index={index} rect={rect} radius={style.radius * unit} />
             ))}
+
+            <LayoutDividers canvasSize={canvasSize} padding={style.padding * unit} />
+
+            <div className="pointer-events-none absolute inset-0 z-20">
+              {texts.map((text) => (
+                <TextOverlayItem key={text.id} text={text} unit={unit} canvasSize={canvasSize} />
+              ))}
+            </div>
           </div>
+
+          {isCropping ? (
+            <CropOverlay size={canvasSize} unit={unit} />
+          ) : (
+            <CanvasResizeHandles size={canvasSize} />
+          )}
         </div>
       )}
     </div>

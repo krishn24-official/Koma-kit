@@ -1,3 +1,4 @@
+import { DownloadDialog } from '@/components/download/DownloadDialog';
 import { CellToolbar } from '@/components/editor/CellToolbar';
 import { Workspace } from '@/components/editor/Workspace';
 import { Header } from '@/components/layout/Header';
@@ -27,6 +28,7 @@ export default function App() {
           <MobilePanel />
         </main>
       </div>
+      <DownloadDialog />
       <Toast />
       <ExportProgress />
     </div>

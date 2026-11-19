@@ -1,6 +1,11 @@
 import { create } from 'zustand';
-import { DEFAULT_ASPECT_RATIO_ID } from '@/constants/aspectRatios';
-import { createDefaultText, DEFAULT_EXPORT_OPTIONS, DEFAULT_STYLE } from '@/constants/editor';
+import { DEFAULT_CANVAS_SIZE, getExactScale } from '@/constants/canvasSizes';
+import {
+  createDefaultText,
+  DEFAULT_EXPORT_OPTIONS,
+  DEFAULT_STYLE,
+  EXPORT_SCALES,
+} from '@/constants/editor';
 import { DEFAULT_LAYOUT_ID, getPreset, MAX_CELLS } from '@/constants/layouts';
 import {
   addLayer as addLayerToTree,
@@ -9,11 +14,15 @@ import {
   equalizeLayout as equalizeTree,
   removeCell,
   resizeDivider as resizeTreeDivider,
+  resolveLayout,
 } from '@/utils/layoutTree';
+import { cropCanvas as cropCanvasContent } from '@/utils/cropCanvas';
 import type {
-  AspectRatioId,
+  BackgroundImage,
+  CanvasSize,
   CanvasStyle,
   CellMedia,
+  CellRect,
   ExportOptions,
   ImageTransform,
   LayoutNode,
@@ -33,7 +42,7 @@ export interface EditorState {
   layoutRoot: LayoutNode;
   /** Preset the layout came from; null once boxes are added, removed or resized. */
   presetId: string | null;
-  aspectRatioId: AspectRatioId;
+  canvasSize: CanvasSize;
   style: CanvasStyle;
   /**
    * Media per cell index, sorted by start time. A cell shows the latest item that has
@@ -61,7 +70,15 @@ export interface EditorActions {
   /** Drags a divider: `delta` is a fraction of the split's length. */
   resizeDivider: (path: number[], boundary: number, delta: number) => void;
   equalizeLayout: () => void;
-  setAspectRatio: (id: AspectRatioId) => void;
+  /**
+   * Changes the canvas shape. Exact sizes (platforms, typed) also set the export to
+   * that exact resolution.
+   */
+  setCanvasSize: (size: CanvasSize) => void;
+  /** Crops the canvas to `rect` (fractions of the canvas), keeping the content in place. */
+  cropCanvas: (rect: CellRect) => void;
+  /** Sets or clears the background picture (frees the old one). */
+  setBackgroundImage: (image: BackgroundImage | null) => void;
   updateStyle: (patch: Partial<CanvasStyle>) => void;
 
   /** Replaces everything in a cell with one item shown from the start. */
@@ -104,7 +121,7 @@ export type EditorStore = EditorState & EditorActions;
 const createInitialState = (): EditorState => ({
   layoutRoot: getPreset(DEFAULT_LAYOUT_ID).root,
   presetId: DEFAULT_LAYOUT_ID,
-  aspectRatioId: DEFAULT_ASPECT_RATIO_ID,
+  canvasSize: DEFAULT_CANVAS_SIZE,
   style: { ...DEFAULT_STYLE },
   cells: {},
   audioSourceId: null,
@@ -228,7 +245,43 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
 
   equalizeLayout: () => set((s) => ({ layoutRoot: equalizeTree(s.layoutRoot), presetId: null })),
 
-  setAspectRatio: (aspectRatioId) => set({ aspectRatioId }),
+  setCanvasSize: (canvasSize) =>
+    set((s) => {
+      const standard = EXPORT_SCALES.some((option) => option.value === s.exportOptions.scale);
+      const scale = canvasSize.exact
+        ? getExactScale(canvasSize)
+        : standard
+          ? s.exportOptions.scale
+          : DEFAULT_EXPORT_OPTIONS.scale;
+      return { canvasSize, exportOptions: { ...s.exportOptions, scale } };
+    }),
+
+  cropCanvas: (rect) =>
+    set((s) => ({
+      ...cropCanvasContent(
+        {
+          canvasSize: s.canvasSize,
+          style: s.style,
+          layoutCells: resolveLayout(s.layoutRoot).cells,
+          cells: s.cells,
+          texts: s.texts,
+        },
+        rect,
+      ),
+    })),
+
+  setBackgroundImage: (image) =>
+    set((s) => {
+      const old = s.style.backgroundImage;
+      if (old && old.src !== image?.src) URL.revokeObjectURL(old.src);
+      return {
+        style: {
+          ...s.style,
+          backgroundImage: image,
+          backgroundType: image ? 'image' : s.style.backgroundType,
+        },
+      };
+    }),
 
   updateStyle: (patch) => set((s) => ({ style: { ...s.style, ...patch } })),
 
@@ -396,8 +449,13 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
     set((s) => ({ exportOptions: { ...s.exportOptions, ...patch } })),
 
   resetProject: () => {
-    const { cells, exportOptions } = get();
+    const { cells, exportOptions, style } = get();
     allItems(cells).forEach(revokeMedia);
-    set({ ...createInitialState(), exportOptions });
+    if (style.backgroundImage) URL.revokeObjectURL(style.backgroundImage.src);
+    // Keep the user's export preferences, except an exact size tied to the old canvas.
+    set({
+      ...createInitialState(),
+      exportOptions: { ...exportOptions, scale: DEFAULT_EXPORT_OPTIONS.scale },
+    });
   },
 }));

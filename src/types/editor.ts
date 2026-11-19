@@ -1,10 +1,27 @@
-export type AspectRatioId = '4:5' | '1:1' | '3:4' | '2:3' | '16:9' | '9:16';
-
-/** Canvas dimensions in design units (width is always 1080). */
+/** Canvas dimensions in design units (width is always 1080; height follows the shape). */
 export interface AspectRatio {
-  id: AspectRatioId;
+  width: number;
+  height: number;
+}
+
+/** The canvas shape the user picked, in real pixels (e.g. 1500 × 500 for an X header). */
+export interface CanvasSize {
+  /** Ratio or platform preset it came from; null for custom or dragged sizes. */
+  presetId: string | null;
+  width: number;
+  height: number;
+  /**
+   * True when these exact pixels matter (platform presets, typed sizes), so export
+   * offers an "exact size" option.
+   */
+  exact: boolean;
+}
+
+export interface CanvasPreset {
+  id: string;
   label: string;
   hint: string;
+  group: 'ratio' | 'platform';
   width: number;
   height: number;
 }
@@ -43,12 +60,31 @@ export interface CellMedia {
   transform: ImageTransform;
 }
 
+export type BackgroundType = 'solid' | 'gradient' | 'image';
+
+export interface BackgroundImage {
+  src: string;
+  file: File;
+  naturalWidth: number;
+  naturalHeight: number;
+}
+
 /** All lengths are in design units (canvas width = 1080). */
 export interface CanvasStyle {
   gap: number;
   padding: number;
   radius: number;
+  backgroundType: BackgroundType;
+  /** Solid fill; also drawn under gradients and images. */
   backgroundColor: string;
+  gradientFrom: string;
+  gradientTo: string;
+  /** CSS-style angle in degrees: 0 = bottom → top, 90 = left → right. */
+  gradientAngle: number;
+  backgroundImage: BackgroundImage | null;
+  backgroundBlur: number;
+  /** Darkening over the image, 0–1, so the boxes stand out. */
+  backgroundDim: number;
 }
 
 export interface FontOption {
