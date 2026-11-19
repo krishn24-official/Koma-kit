@@ -33,8 +33,11 @@ export interface CellMedia {
   fileName: string;
   naturalWidth: number;
   naturalHeight: number;
-  /** Length in seconds (0 for images). */
+  /** Full length of the source file in seconds (0 for images). */
   duration: number;
+  /** Part of the source that plays, in seconds into the file. Videos only (0 for images). */
+  trimStart: number;
+  trimEnd: number;
   /** Timeline time in seconds when this item appears in its cell. */
   start: number;
   transform: ImageTransform;

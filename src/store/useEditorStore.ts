@@ -11,10 +11,13 @@ import type {
   Selection,
   TextOverlay,
 } from '@/types';
+import { clamp } from '@/utils/math';
 import { revokeMedia } from '@/utils/media';
 
 /** Items in a cell closer than this (seconds) count as the same time slot. */
 const SAME_TIME = 0.01;
+/** A trimmed video keeps at least this much (seconds). */
+const MIN_CLIP_LENGTH = 0.1;
 
 export interface EditorState {
   layoutId: string;
@@ -51,6 +54,12 @@ export interface EditorActions {
   clearMedia: () => void;
   updateItemTransform: (index: number, itemId: string, transform: ImageTransform) => void;
   setItemStart: (index: number, itemId: string, start: number) => void;
+  /** Sets which part of a video plays (seconds into the file). Omitted ends stay put. */
+  setItemTrim: (
+    index: number,
+    itemId: string,
+    trim: { trimStart?: number; trimEnd?: number },
+  ) => void;
   setAudioSource: (itemId: string | null) => void;
 
   startSwap: (index: number) => void;
@@ -242,6 +251,24 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
           s.cells,
           index,
           sortByStart(items.map((item) => (item.id === itemId ? { ...item, start: time } : item))),
+        ),
+      };
+    }),
+
+  setItemTrim: (index, itemId, trim) =>
+    set((s) => {
+      const items = s.cells[index];
+      if (!items) return {};
+      return {
+        cells: withItems(
+          s.cells,
+          index,
+          items.map((item) => {
+            if (item.id !== itemId || item.kind !== 'video') return item;
+            const end = clamp(trim.trimEnd ?? item.trimEnd, MIN_CLIP_LENGTH, item.duration);
+            const begin = clamp(trim.trimStart ?? item.trimStart, 0, end - MIN_CLIP_LENGTH);
+            return { ...item, trimStart: begin, trimEnd: end };
+          }),
         ),
       };
     }),

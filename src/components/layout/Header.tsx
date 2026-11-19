@@ -1,6 +1,7 @@
 import { Download, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useExport } from '@/hooks/useExport';
+import { useTimelineDuration } from '@/store/selectors';
 import { useEditorStore } from '@/store/useEditorStore';
 import { usePlaybackStore } from '@/store/usePlaybackStore';
 import { Logo } from './Logo';
@@ -8,6 +9,8 @@ import { Logo } from './Logo';
 export function Header() {
   const resetProject = useEditorStore((s) => s.resetProject);
   const { download, busy } = useExport();
+  const hasTimeline = useTimelineDuration() > 0;
+  const isVideo = useEditorStore((s) => s.exportOptions.format === 'mp4') && hasTimeline;
 
   const handleReset = () => {
     if (!window.confirm('Start over? All images, videos and text will be removed.')) return;
@@ -31,7 +34,7 @@ export function Header() {
           loading={busy === 'download'}
           onClick={download}
         >
-          Download
+          {isVideo ? 'Download MP4' : 'Download'}
         </Button>
       </div>
     </header>

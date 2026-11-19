@@ -5,8 +5,10 @@ import {
   ImagePlus,
   MapPin,
   RefreshCw,
+  Scissors,
   Shrink,
   Trash2,
+  Undo2,
   Volume2,
   VolumeX,
   ZoomIn,
@@ -30,7 +32,7 @@ import {
   getZoomBounds,
 } from '@/utils/imageTransform';
 import { clamp } from '@/utils/math';
-import { formatTime } from '@/utils/timeline';
+import { formatTime, isVideoRunning } from '@/utils/timeline';
 
 const ZOOM_STEP = 1.1;
 
@@ -198,6 +200,60 @@ function TimingControls({ index, item }: { index: number; item: CellMedia | null
   );
 }
 
+/** Cut a video at the playhead: drop everything after (end) or before (start) it. */
+function TrimControls({ index, item }: { index: number; item: CellMedia }) {
+  const currentTime = usePlaybackStore((s) => s.currentTime);
+  const seek = usePlaybackStore((s) => s.seek);
+  const setItemTrim = useEditorStore((s) => s.setItemTrim);
+
+  const fileTime = item.trimStart + (currentTime - item.start);
+  const canCut = isVideoRunning(item, currentTime) && currentTime - item.start > 0.05;
+  const isTrimmed = item.trimStart > 0.01 || item.trimEnd < item.duration - 0.01;
+
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-2 border-t border-neutral-800 pt-2">
+      <Button
+        size="sm"
+        icon={<Scissors />}
+        disabled={!canCut}
+        title="Cut off the rest of the video after the playhead"
+        onClick={() => setItemTrim(index, item.id, { trimEnd: fileTime })}
+      >
+        Trim end here
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        icon={<Scissors className="-scale-x-100" />}
+        disabled={!canCut}
+        title="Cut off the part of the video before the playhead"
+        onClick={() => {
+          setItemTrim(index, item.id, { trimStart: fileTime });
+          seek(item.start);
+        }}
+      >
+        Trim start here
+      </Button>
+      {isTrimmed && (
+        <>
+          <span className="text-xs text-neutral-400 tabular-nums">
+            Plays {formatTime(item.trimStart)}–{formatTime(item.trimEnd)} of{' '}
+            {formatTime(item.duration)}
+          </span>
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={<Undo2 />}
+            onClick={() => setItemTrim(index, item.id, { trimStart: 0, trimEnd: item.duration })}
+          >
+            Undo trim
+          </Button>
+        </>
+      )}
+    </div>
+  );
+}
+
 function CellControls({ index }: { index: number }) {
   const item = useActiveItem(index);
   const cellRect = useDesignCellRects()[index];
@@ -210,6 +266,7 @@ function CellControls({ index }: { index: number }) {
       ) : (
         <EmptyCellControls index={index} />
       )}
+      {item?.kind === 'video' && <TrimControls index={index} item={item} />}
       {hasTimeline && <TimingControls index={index} item={item} />}
     </div>
   );

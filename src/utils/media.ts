@@ -110,6 +110,8 @@ export async function readMediaFile(file: File): Promise<CellMedia> {
         naturalWidth: info.width,
         naturalHeight: info.height,
         duration: info.duration,
+        trimStart: 0,
+        trimEnd: info.duration,
       };
     }
 
@@ -120,6 +122,8 @@ export async function readMediaFile(file: File): Promise<CellMedia> {
       naturalWidth: img.naturalWidth,
       naturalHeight: img.naturalHeight,
       duration: 0,
+      trimStart: 0,
+      trimEnd: 0,
     };
   } catch (error) {
     URL.revokeObjectURL(src);

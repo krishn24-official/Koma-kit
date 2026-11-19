@@ -1,7 +1,7 @@
 import { useEffect, type RefObject } from 'react';
 import { usePlaybackStore, type PlaybackState } from '@/store/usePlaybackStore';
 import type { CellMedia } from '@/types';
-import { getVideoLocalTime, isVideoRunning } from '@/utils/timeline';
+import { getTimelineTimeOf, getVideoLocalTime, isVideoRunning } from '@/utils/timeline';
 
 /** Videos further than this from the timeline (seconds) are re-seeked. */
 const MAX_DRIFT = 0.3;
@@ -22,13 +22,13 @@ export function useVideoSync(
 ) {
   // Only timing matters here. Depending on the whole item would restart playback on
   // every pan/zoom change.
-  const { id, start, duration } = item;
+  const { id, start, trimStart, trimEnd } = item;
 
   useEffect(() => {
     const video = ref.current;
     if (!video) return;
     video.muted = !isAudioSource;
-    const timing = { start, duration };
+    const timing = { start, trimStart, trimEnd };
 
     const sync = ({ currentTime, isPlaying }: PlaybackState) => {
       const target = getVideoLocalTime(timing, currentTime);
@@ -61,7 +61,7 @@ export function useVideoSync(
         id,
         read: () =>
           !video.paused && !video.ended && video.readyState >= 2
-            ? start + video.currentTime
+            ? getTimelineTimeOf(timing, video.currentTime)
             : null,
       });
     }
@@ -71,5 +71,5 @@ export function useVideoSync(
       video.pause();
       if (usePlaybackStore.getState().clockSource?.id === id) setClockSource(null);
     };
-  }, [ref, id, start, duration, isAudioSource]);
+  }, [ref, id, start, trimStart, trimEnd, isAudioSource]);
 }

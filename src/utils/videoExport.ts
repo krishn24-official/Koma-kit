@@ -27,7 +27,12 @@ import {
 import type { CellMedia } from '@/types';
 import { loadImage } from './media';
 import { drawTemplate, loadTextFonts, type TemplateSnapshot } from './renderToCanvas';
-import { getActiveItem, getTimelineDuration, getVideoLocalTime } from './timeline';
+import {
+  getActiveItem,
+  getPlayLength,
+  getTimelineDuration,
+  getVideoLocalTime,
+} from './timeline';
 
 export interface VideoExportOptions {
   width: number;
@@ -237,12 +242,35 @@ async function writeAudioTrack(
     await source.add(new AudioBuffer({ length: leadIn, numberOfChannels, sampleRate }));
   }
 
-  // Sound plays until the video ends, is replaced in its cell, or the timeline ends.
+  // Sound plays until the (trimmed) video ends, is replaced in its cell, or the timeline ends.
   const next = cellItems[cellItems.indexOf(item) + 1];
-  const end = Math.min(duration, item.start + item.duration, next?.start ?? Infinity);
+  const end = Math.min(duration, item.start + getPlayLength(item), next?.start ?? Infinity);
+  const from = item.trimStart;
+  const to = from + (end - item.start);
 
-  for await (const { buffer } of new AudioBufferSink(track).buffers(0, end - item.start)) {
+  // Decoded buffers don't line up with the trim points, so cut them to the exact sample.
+  let remaining = Math.round((to - from) * sampleRate);
+  for await (const { buffer, timestamp } of new AudioBufferSink(track).buffers(from, to)) {
     throwIfAborted(signal);
-    await source.add(buffer);
+    if (remaining <= 0) break;
+    const skip = Math.max(0, Math.round((from - timestamp) * sampleRate));
+    const take = Math.min(buffer.length - skip, remaining);
+    if (take <= 0) continue;
+    await source.add(
+      skip === 0 && take === buffer.length ? buffer : sliceAudioBuffer(buffer, skip, take),
+    );
+    remaining -= take;
   }
+}
+
+function sliceAudioBuffer(buffer: AudioBuffer, offset: number, length: number): AudioBuffer {
+  const out = new AudioBuffer({
+    length,
+    numberOfChannels: buffer.numberOfChannels,
+    sampleRate: buffer.sampleRate,
+  });
+  for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+    out.getChannelData(ch).set(buffer.getChannelData(ch).subarray(offset, offset + length));
+  }
+  return out;
 }

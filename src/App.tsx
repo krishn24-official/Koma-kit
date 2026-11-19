@@ -8,10 +8,12 @@ import { ExportProgress } from '@/components/ui/ExportProgress';
 import { Toast } from '@/components/ui/Toast';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { usePlaybackLoop } from '@/hooks/usePlaybackLoop';
+import { useVideoFormatDefault } from '@/hooks/useVideoFormatDefault';
 
 export default function App() {
   useKeyboardShortcuts();
   usePlaybackLoop();
+  useVideoFormatDefault();
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden">

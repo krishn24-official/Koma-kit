@@ -40,7 +40,7 @@ export function getTimelineDuration(
     for (const item of cells[i] ?? []) {
       if (item.kind === 'video') {
         timed = true;
-        duration = Math.max(duration, item.start + item.duration);
+        duration = Math.max(duration, item.start + getPlayLength(item));
       } else if (item.start > 0) {
         timed = true;
         duration = Math.max(duration, item.start + IMAGE_TAIL_SECONDS);
@@ -51,16 +51,26 @@ export function getTimelineDuration(
   return timed ? duration : 0;
 }
 
-/** Time inside a video for a timeline time. It holds the last frame after the video ends. */
-type Timing = Pick<CellMedia, 'start' | 'duration'>;
+type Timing = Pick<CellMedia, 'start' | 'trimStart' | 'trimEnd'>;
 
+/** How long a video plays on the timeline after trimming. */
+export const getPlayLength = (item: Timing): number => Math.max(0, item.trimEnd - item.trimStart);
+
+/**
+ * Position in the video file (seconds) for a timeline time, respecting the trim.
+ * It holds the last kept frame after the trimmed clip ends.
+ */
 export const getVideoLocalTime = (item: Timing, time: number): number =>
-  clamp(time - item.start, 0, Math.max(0, item.duration - END_MARGIN));
+  item.trimStart + clamp(time - item.start, 0, Math.max(0, getPlayLength(item) - END_MARGIN));
+
+/** Timeline time at which the video file is at `fileTime` (inverse of getVideoLocalTime). */
+export const getTimelineTimeOf = (item: Timing, fileTime: number): number =>
+  item.start + (fileTime - item.trimStart);
 
 /** True while a video should actually be playing (not before its start or after its end). */
 export const isVideoRunning = (item: Timing, time: number): boolean => {
   const local = time - item.start;
-  return local >= 0 && local < item.duration - END_MARGIN;
+  return local >= 0 && local < getPlayLength(item) - END_MARGIN;
 };
 
 /** 75.3 → "1:15.3" */
