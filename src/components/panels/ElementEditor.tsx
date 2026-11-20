@@ -22,13 +22,8 @@ import { ELEMENT_LIMITS } from '@/constants/elements';
 import { useStickerCrop } from '@/hooks/useStickerCrop';
 import { useStickerUpload } from '@/hooks/useStickerUpload';
 import { useEditorStore } from '@/store/useEditorStore';
-import type {
-  BadgeElement,
-  CanvasElement,
-  StickerElement,
-  TextAlign,
-  TextElement,
-} from '@/types';
+import type { BadgeElement, CanvasElement, StickerElement, TextAlign, TextElement } from '@/types';
+import { badgeHeight, maxBadgeTextSize, resizeBadge, setBadgeTextSize } from '@/utils/elements';
 import { FontPicker } from './FontPicker';
 
 type Update<T> = (patch: Partial<T>) => void;
@@ -96,7 +91,11 @@ function TextFields({ text, update }: { text: TextElement; update: Update<TextEl
               onChange={(strokeColor) => update({ strokeColor })}
             />
           )}
-          <Toggle label="Drop shadow" checked={text.shadow} onChange={(shadow) => update({ shadow })} />
+          <Toggle
+            label="Drop shadow"
+            checked={text.shadow}
+            onChange={(shadow) => update({ shadow })}
+          />
         </div>
       </PanelSection>
     </>
@@ -133,22 +132,101 @@ function StickerFields({ sticker }: { sticker: StickerElement }) {
   );
 }
 
+const BADGE_FILL_SWATCHES = [
+  '#ffffff',
+  '#000000',
+  '#e11d48',
+  '#f59e0b',
+  '#2563eb',
+  '#16a34a',
+  '#7c3aed',
+];
+
+/**
+ * Badge settings, most-used first: text, colors, size, then shape and font.
+ */
 function BadgeFields({ badge, update }: { badge: BadgeElement; update: Update<BadgeElement> }) {
+  const height = badgeHeight(badge);
   return (
     <>
       <PanelSection title="Badge">
+        <Field label="Text">
+          {(id) => (
+            <TextInput
+              id={id}
+              value={badge.text}
+              onChange={(e) => update({ text: e.target.value })}
+            />
+          )}
+        </Field>
+      </PanelSection>
+
+      <PanelSection title="Colors">
         <div className="space-y-4">
-          <Field label="Text">
-            {(id) => (
-              <TextInput id={id} value={badge.text} onChange={(e) => update({ text: e.target.value })} />
-            )}
-          </Field>
-          <Slider
-            label="Letter spacing"
-            {...ELEMENT_LIMITS.letterSpacing}
-            value={badge.letterSpacing}
-            onChange={(letterSpacing) => update({ letterSpacing })}
+          <ColorPicker
+            label="Text color"
+            value={badge.textColor}
+            swatches={TEXT_COLOR_SWATCHES}
+            onChange={(textColor) => update({ textColor })}
           />
+          <Toggle
+            label="Filled badge"
+            checked={badge.fill !== null}
+            onChange={(on) => update({ fill: on ? '#e11d48' : null })}
+          />
+          {badge.fill !== null && (
+            <ColorPicker
+              label="Badge color"
+              value={badge.fill}
+              swatches={BADGE_FILL_SWATCHES}
+              onChange={(fill) => update({ fill })}
+            />
+          )}
+          <Slider
+            label="Border width"
+            {...ELEMENT_LIMITS.borderWidth}
+            step={0.5}
+            value={badge.borderWidth}
+            onChange={(borderWidth) => update({ borderWidth })}
+          />
+          {badge.borderWidth > 0 && (
+            <ColorPicker
+              label="Border color"
+              value={badge.borderColor}
+              swatches={TEXT_COLOR_SWATCHES}
+              onChange={(borderColor) => update({ borderColor })}
+            />
+          )}
+        </div>
+      </PanelSection>
+
+      <PanelSection title="Size">
+        <div className="space-y-4">
+          <Slider
+            label="Badge size"
+            min={12}
+            max={240}
+            value={height}
+            onChange={(h) => update(resizeBadge(badge, h / height))}
+            formatValue={(v) => String(Math.round(v))}
+          />
+          <Slider
+            label="Text size"
+            min={ELEMENT_LIMITS.fontSize.min}
+            max={Math.max(ELEMENT_LIMITS.fontSize.min + 1, Math.floor(maxBadgeTextSize(badge)))}
+            value={badge.fontSize}
+            onChange={(size) => update(setBadgeTextSize(badge, size))}
+            formatValue={(v) => String(Math.round(v))}
+          />
+          <p className="text-xs text-neutral-500">
+            Badge size scales everything together. Text size changes only the text; the badge keeps
+            its height.
+          </p>
+        </div>
+      </PanelSection>
+
+      <PanelSection title="Shape">
+        <div className="space-y-4">
           <Slider
             label="Roundness"
             min={0}
@@ -175,48 +253,17 @@ function BadgeFields({ badge, update }: { badge: BadgeElement; update: Update<Ba
             onChange={(paddingY) => update({ paddingY })}
             formatValue={(v) => v.toFixed(2)}
           />
+          <Slider
+            label="Letter spacing"
+            {...ELEMENT_LIMITS.letterSpacing}
+            value={badge.letterSpacing}
+            onChange={(letterSpacing) => update({ letterSpacing })}
+          />
         </div>
       </PanelSection>
+
       <PanelSection title="Font">
         <FontPicker value={badge.fontId} onChange={(fontId) => update({ fontId })} />
-      </PanelSection>
-      <PanelSection title="Colors">
-        <div className="space-y-4">
-          <ColorPicker
-            label="Text color"
-            value={badge.textColor}
-            swatches={TEXT_COLOR_SWATCHES}
-            onChange={(textColor) => update({ textColor })}
-          />
-          <Toggle
-            label="Filled background"
-            checked={badge.fill !== null}
-            onChange={(on) => update({ fill: on ? '#e11d48' : null })}
-          />
-          {badge.fill !== null && (
-            <ColorPicker
-              label="Fill color"
-              value={badge.fill}
-              swatches={TEXT_COLOR_SWATCHES}
-              onChange={(fill) => update({ fill })}
-            />
-          )}
-          <Slider
-            label="Border width"
-            {...ELEMENT_LIMITS.borderWidth}
-            step={0.5}
-            value={badge.borderWidth}
-            onChange={(borderWidth) => update({ borderWidth })}
-          />
-          {badge.borderWidth > 0 && (
-            <ColorPicker
-              label="Border color"
-              value={badge.borderColor}
-              swatches={TEXT_COLOR_SWATCHES}
-              onChange={(borderColor) => update({ borderColor })}
-            />
-          )}
-        </div>
       </PanelSection>
     </>
   );
@@ -230,10 +277,23 @@ export function ElementEditor({ element }: { element: CanvasElement }) {
   const moveElement = useEditorStore((s) => s.moveElement);
   const update = (patch: Partial<CanvasElement>) => updateElement(element.id, patch);
 
+  // Badges have their own Badge size / Text size sliders.
   const size =
     element.type === 'sticker'
-      ? { label: 'Width', ...ELEMENT_LIMITS.stickerWidth, value: element.width, key: 'width' as const }
-      : { label: 'Size', ...ELEMENT_LIMITS.fontSize, value: element.fontSize, key: 'fontSize' as const };
+      ? {
+          label: 'Width',
+          ...ELEMENT_LIMITS.stickerWidth,
+          value: element.width,
+          key: 'width' as const,
+        }
+      : element.type === 'text'
+        ? {
+            label: 'Size',
+            ...ELEMENT_LIMITS.fontSize,
+            value: element.fontSize,
+            key: 'fontSize' as const,
+          }
+        : null;
 
   return (
     <div className="space-y-6">
@@ -241,16 +301,18 @@ export function ElementEditor({ element }: { element: CanvasElement }) {
       {element.type === 'sticker' && <StickerFields sticker={element} />}
       {element.type === 'badge' && <BadgeFields badge={element} update={update} />}
 
-      <PanelSection title="Size & position">
+      <PanelSection title={element.type === 'badge' ? 'Position' : 'Size & position'}>
         <div className="space-y-4">
-          <Slider
-            label={size.label}
-            min={size.min}
-            max={size.max}
-            value={size.value}
-            onChange={(v) => update({ [size.key]: v })}
-            formatValue={(v) => String(Math.round(v))}
-          />
+          {size && (
+            <Slider
+              label={size.label}
+              min={size.min}
+              max={size.max}
+              value={size.value}
+              onChange={(v) => update({ [size.key]: v })}
+              formatValue={(v) => String(Math.round(v))}
+            />
+          )}
           <Slider
             label="Rotation"
             {...ELEMENT_LIMITS.rotation}
