@@ -37,14 +37,14 @@ export function ElementsPanel() {
           <Button size="sm" icon={<ImagePlus />} onClick={() => inputRef.current?.click()}>
             Logo
           </Button>
-          <Button size="sm" icon={<RectangleHorizontal />} onClick={() => addElement(createBadge())}>
+          <Button
+            size="sm"
+            icon={<RectangleHorizontal />}
+            onClick={() => addElement(createBadge())}
+          >
             Badge
           </Button>
         </div>
-        <p className="mt-2 text-xs leading-relaxed text-neutral-400">
-          Logos work best as transparent PNGs. Drag anything on the canvas to move it, and
-          drag its corner dot to resize.
-        </p>
         <HiddenFileInput
           ref={inputRef}
           accept="image/*"

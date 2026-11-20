@@ -25,15 +25,8 @@ export function BoxFadeSection() {
   const fade = useEditorStore((s) => (index === null ? undefined : s.boxFades[index]));
   const setBoxFade = useEditorStore((s) => s.setBoxFade);
 
-  if (index === null) {
-    return (
-      <PanelSection title="Box fade">
-        <p className="text-sm text-neutral-400">
-          Select a box on the canvas to fade its picture into a color.
-        </p>
-      </PanelSection>
-    );
-  }
+  // Fades belong to a box, so the controls only show once a box is selected.
+  if (index === null) return null;
 
   const update = (patch: Partial<BoxFade>) => fade && setBoxFade(index, { ...fade, ...patch });
 

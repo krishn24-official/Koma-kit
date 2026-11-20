@@ -21,11 +21,6 @@ export function CanvasPanel() {
             Fit to pictures
           </Button>
         </div>
-        <p className="mt-2 text-xs leading-relaxed text-neutral-400">
-          <span className="text-neutral-200">Crop</span> cuts the canvas to the area you
-          choose; edges snap to your pictures. <span className="text-neutral-200">Fit</span>{' '}
-          picks the height automatically so every picture fills its box.
-        </p>
       </PanelSection>
       <PanelSection title="Canvas size">
         <CanvasSizePicker />

@@ -5,11 +5,7 @@ import { ColorPicker } from '@/components/ui/ColorPicker';
 import { HiddenFileInput } from '@/components/ui/HiddenFileInput';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Slider } from '@/components/ui/Slider';
-import {
-  BACKGROUND_LIMITS,
-  BACKGROUND_SWATCHES,
-  GRADIENT_PRESETS,
-} from '@/constants/editor';
+import { BACKGROUND_LIMITS, BACKGROUND_SWATCHES, GRADIENT_PRESETS } from '@/constants/editor';
 import { useEditorStore } from '@/store/useEditorStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { BackgroundType } from '@/types';
@@ -177,12 +173,6 @@ export function BackgroundSection() {
       )}
       {style.backgroundType === 'gradient' && <GradientControls />}
       {style.backgroundType === 'image' && <ImageControls />}
-      {style.backgroundType !== 'solid' && style.gap === 0 && style.padding === 0 && (
-        <p className="rounded-lg bg-neutral-800/60 px-3 py-2 text-xs text-neutral-300">
-          The background shows in the gaps and border. Turn up “Gap between images” or “Outer
-          border” in the Style tab to see it.
-        </p>
-      )}
     </div>
   );
 }
