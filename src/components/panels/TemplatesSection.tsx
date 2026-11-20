@@ -13,7 +13,10 @@ export function TemplatesSection() {
   const apply = (template: StarterTemplate) => {
     const s = useEditorStore.getState();
     const hasWork = Object.keys(s.cells).length > 0 || s.elements.length > 0;
-    if (hasWork && !window.confirm(`Start a new ${template.name}? Your current design will be replaced.`)) {
+    if (
+      hasWork &&
+      !window.confirm(`Start a new ${template.name}? Your current design will be replaced.`)
+    ) {
       return;
     }
     usePlaybackStore.getState().pause();
@@ -31,19 +34,15 @@ export function TemplatesSection() {
             key={template.id}
             type="button"
             onClick={() => apply(template)}
+            title={template.description}
             className="flex w-full items-center gap-3 rounded-xl border border-neutral-800 p-3 text-left transition-colors hover:border-brand-500 hover:bg-brand-500/5"
           >
             <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-brand-500/15 text-brand-400">
               <Newspaper className="size-5" aria-hidden />
             </span>
-            <span className="min-w-0">
-              <span className="flex items-baseline gap-2">
-                <span className="text-sm font-semibold text-neutral-100">{template.name}</span>
-                <span className="text-[11px] text-neutral-500 tabular-nums">{template.size}</span>
-              </span>
-              <span className="block text-xs leading-snug text-neutral-400">
-                {template.description}
-              </span>
+            <span className="flex min-w-0 items-baseline gap-2">
+              <span className="text-sm font-semibold text-neutral-100">{template.name}</span>
+              <span className="text-[11px] text-neutral-500 tabular-nums">{template.size}</span>
             </span>
           </button>
         ))}

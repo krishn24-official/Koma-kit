@@ -152,18 +152,10 @@ export function CanvasSizePicker() {
             Now {canvasSize.width} × {canvasSize.height} ·{' '}
             {describeRatio(canvasSize.width, canvasSize.height)}
           </span>
-          <Button
-            type="submit"
-            size="sm"
-            icon={<Check />}
-            disabled={!draft.width && !draft.height}
-          >
+          <Button type="submit" size="sm" icon={<Check />} disabled={!draft.width && !draft.height}>
             Apply
           </Button>
         </div>
-        <p className="mt-2 text-xs text-neutral-500">
-          Or drag the white grips on the canvas edges to reshape it.
-        </p>
       </form>
     </div>
   );

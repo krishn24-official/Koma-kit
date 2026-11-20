@@ -218,10 +218,6 @@ function BadgeFields({ badge, update }: { badge: BadgeElement; update: Update<Ba
             onChange={(size) => update(setBadgeTextSize(badge, size))}
             formatValue={(v) => String(Math.round(v))}
           />
-          <p className="text-xs text-neutral-500">
-            Badge size scales everything together. Text size changes only the text; the badge keeps
-            its height.
-          </p>
         </div>
       </PanelSection>
 

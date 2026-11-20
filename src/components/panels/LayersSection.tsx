@@ -47,12 +47,9 @@ export function LayersSection() {
           disabled={selectedIndex === null || boxCount <= 1}
           onClick={() => selectedIndex !== null && removeBox(selectedIndex)}
         >
-          {selectedIndex === null ? 'Select a box to remove it' : `Remove box ${selectedIndex + 1}`}
+          {selectedIndex === null ? 'Remove box' : `Remove box ${selectedIndex + 1}`}
         </Button>
       </div>
-      <p className="mt-2 text-xs leading-relaxed text-neutral-400">
-        Drag the white handles between boxes to make any box bigger or smaller.
-      </p>
     </PanelSection>
   );
 }
