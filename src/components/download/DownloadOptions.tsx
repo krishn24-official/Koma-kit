@@ -12,6 +12,7 @@ import {
   useCurrentAspectRatio,
   useCurrentLayout,
   useFilledCellCount,
+  useHasAudibleVideo,
   useTimelineDuration,
 } from '@/store/selectors';
 import { useEditorStore } from '@/store/useEditorStore';
@@ -44,7 +45,7 @@ interface DownloadOptionsProps {
 export function DownloadOptions({ onDone }: DownloadOptionsProps) {
   const options = useEditorStore((s) => s.exportOptions);
   const updateOptions = useEditorStore((s) => s.updateExportOptions);
-  const hasAudio = useEditorStore((s) => s.audioSourceId !== null);
+  const hasAudio = useHasAudibleVideo();
   const aspectRatio = useCurrentAspectRatio();
   const canvasSize = useEditorStore((s) => s.canvasSize);
   const emptyCells = useCurrentLayout().cells.length - useFilledCellCount();
@@ -140,7 +141,7 @@ export function DownloadOptions({ onDone }: DownloadOptionsProps) {
         )}
         {isVideo && !hasAudio && (
           <Note tone="warn">
-            No sound selected. Select a video cell and tap the speaker button to use its sound.
+            All clips are muted. Select a clip and tap its speaker button to turn its sound on.
           </Note>
         )}
         {isVideo && duration > X_MAX_VIDEO_SECONDS && (

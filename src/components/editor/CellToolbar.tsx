@@ -5,7 +5,9 @@ import {
   Crop as CropIcon,
   Expand,
   ImagePlus,
+  ListVideo,
   MapPin,
+  Play,
   Plus,
   RefreshCw,
   Scan,
@@ -26,9 +28,15 @@ import { Slider } from '@/components/ui/Slider';
 import { DEFAULT_TRANSFORM } from '@/constants/editor';
 import { useCrop } from '@/hooks/useCrop';
 import { useFitToPictures } from '@/hooks/useFitToPictures';
+import { useMediaCrop } from '@/hooks/useMediaCrop';
 import { useStickerCrop } from '@/hooks/useStickerCrop';
 import { useMediaUpload } from '@/hooks/useMediaUpload';
-import { useActiveItem, useDesignCellRects, useTimelineDuration } from '@/store/selectors';
+import {
+  useActiveItem,
+  useCurrentLayout,
+  useDesignCellRects,
+  useTimelineDuration,
+} from '@/store/selectors';
 import { useEditorStore } from '@/store/useEditorStore';
 import { usePlaybackStore } from '@/store/usePlaybackStore';
 import { useUiStore } from '@/store/useUiStore';
@@ -39,8 +47,9 @@ import {
   getImageSize,
   getZoomBounds,
 } from '@/utils/imageTransform';
+import { hasBars } from '@/utils/detectBars';
 import { clamp } from '@/utils/math';
-import { formatTime, isVideoRunning } from '@/utils/timeline';
+import { formatTime, getPlayLength, getPlayStart, isVideoRunning } from '@/utils/timeline';
 
 const ZOOM_STEP = 1.1;
 
@@ -59,10 +68,9 @@ function MediaControls({ index, item, cellRect }: MediaControlsProps) {
   const updateItemTransform = useEditorStore((s) => s.updateItemTransform);
   const removeItem = useEditorStore((s) => s.removeItem);
   const startSwap = useEditorStore((s) => s.startSwap);
-  const isAudioSource = useEditorStore((s) => s.audioSourceId === item.id);
-  const setAudioSource = useEditorStore((s) => s.setAudioSource);
+  const setItemMuted = useEditorStore((s) => s.setItemMuted);
   const { replaceInCell } = useMediaUpload();
-  const { start: startCrop } = useCrop();
+  const { start: startMediaCrop } = useMediaCrop();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const mediaSize = getImageSize(item);
@@ -105,13 +113,17 @@ function MediaControls({ index, item, cellRect }: MediaControlsProps) {
       <div className="flex items-center justify-center gap-1">
         {item.kind === 'video' && (
           <IconButton
-            label={isAudioSource ? 'Mute this video' : "Use this video's sound"}
-            variant={isAudioSource ? 'secondary' : 'ghost'}
-            icon={isAudioSource ? <Volume2 /> : <VolumeX />}
-            onClick={() => setAudioSource(isAudioSource ? null : item.id)}
+            label={item.muted ? 'Turn sound on' : 'Mute this clip'}
+            variant={item.muted ? 'ghost' : 'secondary'}
+            icon={item.muted ? <VolumeX /> : <Volume2 />}
+            onClick={() => setItemMuted(index, item.id, !item.muted)}
           />
         )}
-        <IconButton label="Crop canvas" icon={<CropIcon />} onClick={startCrop} />
+        <IconButton
+          label={item.kind === 'video' ? 'Crop this clip' : 'Crop this picture'}
+          icon={<CropIcon />}
+          onClick={() => startMediaCrop(index, item.id)}
+        />
         <IconButton
           label="Fit whole picture"
           icon={<Shrink />}
@@ -122,7 +134,11 @@ function MediaControls({ index, item, cellRect }: MediaControlsProps) {
           icon={<Expand />}
           onClick={() => setTransform(DEFAULT_TRANSFORM)}
         />
-        <IconButton label="Replace" icon={<RefreshCw />} onClick={() => inputRef.current?.click()} />
+        <IconButton
+          label="Replace"
+          icon={<RefreshCw />}
+          onClick={() => inputRef.current?.click()}
+        />
         <IconButton
           label="Swap with another cell"
           icon={<ArrowLeftRight />}
@@ -216,8 +232,9 @@ function TrimControls({ index, item }: { index: number; item: CellMedia }) {
   const seek = usePlaybackStore((s) => s.seek);
   const setItemTrim = useEditorStore((s) => s.setItemTrim);
 
-  const fileTime = item.trimStart + (currentTime - item.start);
-  const canCut = isVideoRunning(item, currentTime) && currentTime - item.start > 0.05;
+  const playStart = getPlayStart(item);
+  const fileTime = item.trimStart + (currentTime - playStart);
+  const canCut = isVideoRunning(item, currentTime) && currentTime - playStart > 0.05;
   const isTrimmed = item.trimStart > 0.01 || item.trimEnd < item.duration - 0.01;
 
   return (
@@ -239,7 +256,7 @@ function TrimControls({ index, item }: { index: number; item: CellMedia }) {
         title="Cut off the part of the video before the playhead"
         onClick={() => {
           setItemTrim(index, item.id, { trimStart: fileTime });
-          seek(item.start);
+          seek(playStart);
         }}
       >
         Trim start here
@@ -264,6 +281,68 @@ function TrimControls({ index, item }: { index: number; item: CellMedia }) {
   );
 }
 
+/**
+ * When a video starts playing. It stays on its first frame until then, e.g. to play
+ * after the clip in another box ends.
+ */
+function DelayControls({ index, item }: { index: number; item: CellMedia }) {
+  const cellCount = useCurrentLayout().cells.length;
+  const cells = useEditorStore((s) => s.cells);
+  const setItemDelay = useEditorStore((s) => s.setItemDelay);
+  const currentTime = usePlaybackStore((s) => s.currentTime);
+  const playStart = getPlayStart(item);
+
+  // The latest moment a video in each other box finishes.
+  const otherBoxes: Array<{ box: number; end: number }> = [];
+  for (let i = 0; i < cellCount; i++) {
+    if (i === index) continue;
+    const ends = (cells[i] ?? [])
+      .filter((other) => other.kind === 'video')
+      .map((other) => getPlayStart(other) + getPlayLength(other));
+    if (ends.length > 0) otherBoxes.push({ box: i, end: Math.max(...ends) });
+  }
+
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-2 border-t border-neutral-800 pt-2">
+      {otherBoxes.map(({ box, end }) => (
+        <Button
+          key={box}
+          size="sm"
+          icon={<ListVideo />}
+          title={`Wait on the first frame, then play when box ${box + 1}'s video ends`}
+          onClick={() => setItemDelay(index, item.id, end - item.start)}
+        >
+          Play after box {box + 1}
+        </Button>
+      ))}
+      <Button
+        size="sm"
+        variant="ghost"
+        icon={<Play />}
+        disabled={currentTime <= item.start + 0.05}
+        onClick={() => setItemDelay(index, item.id, currentTime - item.start)}
+      >
+        Play from {formatTime(currentTime)}
+      </Button>
+      {item.delay > 0 && (
+        <>
+          <span className="text-xs text-neutral-400 tabular-nums">
+            Plays at {formatTime(playStart)}
+          </span>
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={<Undo2 />}
+            onClick={() => setItemDelay(index, item.id, 0)}
+          >
+            Play right away
+          </Button>
+        </>
+      )}
+    </div>
+  );
+}
+
 function CellControls({ index }: { index: number }) {
   const item = useActiveItem(index);
   const cellRect = useDesignCellRects()[index];
@@ -277,6 +356,7 @@ function CellControls({ index }: { index: number }) {
         <EmptyCellControls index={index} />
       )}
       {item?.kind === 'video' && <TrimControls index={index} item={item} />}
+      {item?.kind === 'video' && <DelayControls index={index} item={item} />}
       {hasTimeline && <TimingControls index={index} item={item} />}
     </div>
   );
@@ -293,6 +373,9 @@ export function CellToolbar() {
   const isCropping = useUiStore((s) => s.cropRect !== null);
   const crop = useCrop();
   const stickerCrop = useStickerCrop();
+  const mediaCrop = useMediaCrop();
+  const mediaCropping = useUiStore((s) => s.mediaCrop !== null);
+  const canRemoveBars = useUiStore((s) => Boolean(s.mediaCrop?.bars && hasBars(s.mediaCrop.bars)));
   const stickerCropping = useUiStore((s) => s.stickerCrop !== null);
   const selectedIsPicture = useEditorStore((s) => {
     const sel = s.selection;
@@ -303,7 +386,29 @@ export function CellToolbar() {
 
   let content: ReactNode;
 
-  if (stickerCropping) {
+  if (mediaCropping) {
+    content = (
+      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
+        <Hint>Drag the frame's edges or corners to cut the picture.</Hint>
+        <div className="flex flex-wrap justify-center gap-2">
+          {canRemoveBars && (
+            <Button size="sm" icon={<Scan />} onClick={mediaCrop.removeBars}>
+              Remove black bars
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" onClick={mediaCrop.reset}>
+            Reset
+          </Button>
+          <Button size="sm" onClick={mediaCrop.cancel}>
+            Cancel
+          </Button>
+          <Button size="sm" variant="primary" icon={<Check />} onClick={mediaCrop.apply}>
+            Apply crop
+          </Button>
+        </div>
+      </div>
+    );
+  } else if (stickerCropping) {
     content = (
       <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
         <Hint>Drag the frame's edges or corners to cut the logo.</Hint>

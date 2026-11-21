@@ -4,12 +4,14 @@ import { HiddenFileInput } from '@/components/ui/HiddenFileInput';
 import { useMediaUpload } from '@/hooks/useMediaUpload';
 import { useActiveItem } from '@/store/selectors';
 import { useEditorStore } from '@/store/useEditorStore';
+import { useUiStore } from '@/store/useUiStore';
 import type { PixelRect } from '@/types';
 import { boxFadeCss } from '@/utils/background';
 import { formatTime } from '@/utils/timeline';
 import { CellImageView } from './CellImageView';
 import { CellVideoView } from './CellVideoView';
 import { EmptyCell } from './EmptyCell';
+import { MediaCropper } from './MediaCropper';
 
 interface GridCellProps {
   index: number;
@@ -25,6 +27,8 @@ export function GridCell({ index, rect, radius }: GridCellProps) {
   );
   const swapSource = useEditorStore((s) => s.swapSource);
   const fade = useEditorStore((s) => s.boxFades[index]);
+  const cropItemId = useUiStore((s) => (s.mediaCrop?.index === index ? s.mediaCrop.itemId : null));
+  const cropItem = cropItemId ? (items?.find((it) => it.id === cropItemId) ?? null) : null;
   const select = useEditorStore((s) => s.select);
   const swapCells = useEditorStore((s) => s.swapCells);
   const { uploadToCell } = useMediaUpload();
@@ -92,6 +96,8 @@ export function GridCell({ index, rect, radius }: GridCellProps) {
           }}
         />
       )}
+
+      {cropItem && <MediaCropper item={cropItem} size={size} />}
 
       {fade && (
         <div

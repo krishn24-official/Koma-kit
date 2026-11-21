@@ -80,6 +80,16 @@ export function getTemplateSnapshot(): TemplateSnapshot {
     cells: s.cells,
     elements: s.elements,
     boxFades: s.boxFades,
-    audioSourceId: s.audioSourceId,
   };
 }
+
+/** True if any visible box has a video whose sound is on. */
+export const useHasAudibleVideo = (): boolean => {
+  const cellCount = useCurrentLayout().cells.length;
+  return useEditorStore((s) =>
+    Object.entries(s.cells).some(
+      ([key, items]) =>
+        Number(key) < cellCount && items.some((item) => item.kind === 'video' && !item.muted),
+    ),
+  );
+};

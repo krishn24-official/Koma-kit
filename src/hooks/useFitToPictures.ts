@@ -5,6 +5,7 @@ import { useEditorStore } from '@/store/useEditorStore';
 import { usePlaybackStore } from '@/store/usePlaybackStore';
 import { useUiStore } from '@/store/useUiStore';
 import { findBestCanvasRatio } from '@/utils/fitCanvas';
+import { getImageSize } from '@/utils/imageTransform';
 import { resolveLayout } from '@/utils/layoutTree';
 import { getActiveItem } from '@/utils/timeline';
 
@@ -23,7 +24,7 @@ export function useFitToPictures() {
     const ratio = findBestCanvasRatio(
       cells,
       s.style,
-      items.map((item) => (item ? { width: item.naturalWidth, height: item.naturalHeight } : null)),
+      items.map((item) => (item ? getImageSize(item) : null)),
     );
 
     if (ratio === null) {

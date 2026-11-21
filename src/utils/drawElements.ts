@@ -92,7 +92,14 @@ function drawBadge(ctx: Ctx, badge: BadgeElement, unit: number) {
   }
   if (s.borderWidth > 0) {
     const half = s.borderWidth / 2;
-    traceRoundRect(ctx, x + half, y + half, width - s.borderWidth, s.height - s.borderWidth, s.radius - half);
+    traceRoundRect(
+      ctx,
+      x + half,
+      y + half,
+      width - s.borderWidth,
+      s.height - s.borderWidth,
+      s.radius - half,
+    );
     ctx.lineWidth = s.borderWidth;
     ctx.strokeStyle = badge.borderColor;
     ctx.stroke();

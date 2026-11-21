@@ -2,13 +2,7 @@
  * Pure functions for the layout tree (see `LayoutNode`). All of them return new trees
  * and never mutate their input, so they work directly with the store.
  */
-import type {
-  CellRect,
-  LayoutDivider,
-  LayoutNode,
-  ResolvedLayout,
-  SplitDirection,
-} from '@/types';
+import type { CellRect, LayoutDivider, LayoutNode, ResolvedLayout, SplitDirection } from '@/types';
 import { clamp } from './math';
 
 /** Smallest share of its split a box can be dragged down to. */
@@ -48,9 +42,7 @@ export const countCells = (node: LayoutNode): number =>
 export function span(node: LayoutNode, direction: SplitDirection): number {
   if (node.type === 'cell') return 1;
   const spans = node.children.map((child) => span(child, direction));
-  return node.direction === direction
-    ? spans.reduce((a, b) => a + b, 0)
-    : Math.max(...spans);
+  return node.direction === direction ? spans.reduce((a, b) => a + b, 0) : Math.max(...spans);
 }
 
 // ─── Geometry ────────────────────────────────────────────────────────────────

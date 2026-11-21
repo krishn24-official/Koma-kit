@@ -5,19 +5,46 @@ import { getTimelineDuration } from '@/utils/timeline';
 import { useEditorStore } from './useEditorStore';
 
 /**
- * Something that can report the true playback position, normally the video whose
- * audio is playing. Following it keeps pictures in sync with the sound.
+ * A playing video that can report the true playback position. Following it keeps
+ * pictures in sync with the sound.
  */
 export interface ClockSource {
   id: string;
-  /** Current timeline time, or null when the source isn't actually playing. */
+  /** True when its sound is on; audible clips are preferred as the clock. */
+  audible: boolean;
+  /** Current timeline time, or null when the video isn't actually playing. */
   read: () => number | null;
+}
+
+/**
+ * Registered clocks. Kept outside the store on purpose: registering must not wake up
+ * every subscriber, and only the playback loop reads it.
+ */
+const clocks = new Map<string, ClockSource>();
+
+/** Adds a clock; returns a function that removes it again. */
+export function registerClock(source: ClockSource): () => void {
+  clocks.set(source.id, source);
+  return () => {
+    if (clocks.get(source.id) === source) clocks.delete(source.id);
+  };
+}
+
+/** Timeline time from a playing video (audible ones first), or null if none is playing. */
+export function readClock(): number | null {
+  let fallback: number | null = null;
+  for (const clock of clocks.values()) {
+    const time = clock.read();
+    if (time === null) continue;
+    if (clock.audible) return time;
+    fallback ??= time;
+  }
+  return fallback;
 }
 
 export interface PlaybackState {
   currentTime: number;
   isPlaying: boolean;
-  clockSource: ClockSource | null;
 }
 
 interface PlaybackActions {
@@ -25,7 +52,6 @@ interface PlaybackActions {
   pause: () => void;
   toggle: () => void;
   seek: (time: number) => void;
-  setClockSource: (source: ClockSource | null) => void;
 }
 
 /** Timeline length for the current editor state. */
@@ -37,7 +63,6 @@ export const getCurrentDuration = (): number => {
 export const usePlaybackStore = create<PlaybackState & PlaybackActions>()((set, get) => ({
   currentTime: 0,
   isPlaying: false,
-  clockSource: null,
 
   play: () => {
     const duration = getCurrentDuration();
@@ -54,6 +79,4 @@ export const usePlaybackStore = create<PlaybackState & PlaybackActions>()((set, 
   toggle: () => (get().isPlaying ? get().pause() : get().play()),
 
   seek: (time) => set({ currentTime: clamp(time, 0, getCurrentDuration()) }),
-
-  setClockSource: (clockSource) => set({ clockSource }),
 }));

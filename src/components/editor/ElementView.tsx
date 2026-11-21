@@ -229,9 +229,7 @@ export function ElementView({ element, unit, canvasSize }: ElementViewProps) {
       {element.type === 'text' && <TextContent text={element} unit={unit} />}
       {element.type === 'sticker' && <StickerContent sticker={element} unit={unit} />}
       {element.type === 'badge' && <BadgeContent badge={element} unit={unit} />}
-      {isCropping && element.type === 'sticker' && (
-        <StickerCropper sticker={element} unit={unit} />
-      )}
+      {isCropping && element.type === 'sticker' && <StickerCropper sticker={element} unit={unit} />}
 
       {isSelected && !isCropping && (
         <div

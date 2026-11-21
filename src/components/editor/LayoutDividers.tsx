@@ -28,9 +28,7 @@ function DividerHandle({ divider, inner }: DividerHandleProps) {
       if (last) setDragging(false);
       const moved = horizontal ? dx : dy;
       if (moved === 0 || splitLength <= 0) return;
-      useEditorStore
-        .getState()
-        .resizeDivider(divider.path, divider.boundary, moved / splitLength);
+      useEditorStore.getState().resizeDivider(divider.path, divider.boundary, moved / splitLength);
     },
     { pointer: { capture: true } },
   );

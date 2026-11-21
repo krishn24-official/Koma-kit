@@ -1,10 +1,13 @@
 import { MAX_ZOOM } from '@/constants/editor';
-import type { CellMedia, ImageTransform, PixelRect, Size } from '@/types';
+import type { CellMedia, CellRect, ImageTransform, PixelRect, Size } from '@/types';
 import { clamp } from './math';
 
-export const getImageSize = (image: Pick<CellMedia, 'naturalWidth' | 'naturalHeight'>): Size => ({
-  width: image.naturalWidth,
-  height: image.naturalHeight,
+/** Size of the part of the media that is used (after cropping), in its own pixels. */
+export const getImageSize = (
+  image: Pick<CellMedia, 'naturalWidth' | 'naturalHeight'> & { crop?: CellRect },
+): Size => ({
+  width: image.naturalWidth * (image.crop?.w ?? 1),
+  height: image.naturalHeight * (image.crop?.h ?? 1),
 });
 
 /** Scale at which the image exactly covers the cell (no empty space). */
@@ -63,3 +66,21 @@ export const getFitTransform = (image: Size, cell: Size): ImageTransform => ({
   offsetX: 0,
   offsetY: 0,
 });
+
+/**
+ * Preview layout for cropped media in a box: `frame` is where the visible (cropped) part
+ * goes, relative to the box; `media` is where the whole picture/video sits inside that
+ * clipping frame so only the cropped part shows.
+ */
+export function getCroppedMediaLayout(
+  item: Pick<CellMedia, 'naturalWidth' | 'naturalHeight' | 'crop' | 'transform'>,
+  cell: Size,
+) {
+  const frame = getImageRect(getImageSize(item), cell, item.transform);
+  const width = frame.width / item.crop.w;
+  const height = frame.height / item.crop.h;
+  return {
+    frame,
+    media: { left: -item.crop.x * width, top: -item.crop.y * height, width, height },
+  };
+}

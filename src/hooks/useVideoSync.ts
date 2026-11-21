@@ -1,5 +1,5 @@
 import { useEffect, type RefObject } from 'react';
-import { usePlaybackStore, type PlaybackState } from '@/store/usePlaybackStore';
+import { registerClock, usePlaybackStore, type PlaybackState } from '@/store/usePlaybackStore';
 import type { CellMedia } from '@/types';
 import { getTimelineTimeOf, getVideoLocalTime, isVideoRunning } from '@/utils/timeline';
 
@@ -11,24 +11,21 @@ const SEEK_TOLERANCE = 0.02;
 /**
  * Keeps a <video> element in step with the shared timeline:
  * plays/pauses with it, follows seeks, and holds the last frame after the clip ends.
+ * Every clip plays its own sound unless it's muted.
  *
- * The audio-source video also becomes the timeline's clock, so pictures follow the
- * sound rather than the other way round.
+ * Each playing video also offers itself as the timeline's clock, so pictures follow
+ * the sound rather than the other way round.
  */
-export function useVideoSync(
-  ref: RefObject<HTMLVideoElement>,
-  item: CellMedia,
-  isAudioSource: boolean,
-) {
-  // Only timing matters here. Depending on the whole item would restart playback on
-  // every pan/zoom change.
-  const { id, start, trimStart, trimEnd } = item;
+export function useVideoSync(ref: RefObject<HTMLVideoElement>, item: CellMedia) {
+  // Only timing and mute matter here. Depending on the whole item would restart
+  // playback on every pan/zoom change.
+  const { id, start, delay, trimStart, trimEnd, muted } = item;
 
   useEffect(() => {
     const video = ref.current;
     if (!video) return;
-    video.muted = !isAudioSource;
-    const timing = { start, trimStart, trimEnd };
+    video.muted = muted;
+    const timing = { start, delay, trimStart, trimEnd };
 
     const sync = ({ currentTime, isPlaying }: PlaybackState) => {
       const target = getVideoLocalTime(timing, currentTime);
@@ -36,8 +33,8 @@ export function useVideoSync(
       if (isPlaying && isVideoRunning(timing, currentTime)) {
         if (video.paused) {
           video.currentTime = target;
-          // Runs inside the Play tap, so sound is allowed. If the browser still refuses,
-          // play muted rather than not at all.
+          // Allowed with sound after the first tap on the page. If the browser still
+          // refuses, play muted rather than not at all.
           video.play().catch(() => {
             video.muted = true;
             video.play().catch(() => undefined);
@@ -54,22 +51,19 @@ export function useVideoSync(
 
     sync(usePlaybackStore.getState());
     const unsubscribe = usePlaybackStore.subscribe(sync);
-
-    const { setClockSource } = usePlaybackStore.getState();
-    if (isAudioSource) {
-      setClockSource({
-        id,
-        read: () =>
-          !video.paused && !video.ended && video.readyState >= 2
-            ? getTimelineTimeOf(timing, video.currentTime)
-            : null,
-      });
-    }
+    const unregister = registerClock({
+      id,
+      audible: !muted,
+      read: () =>
+        !video.paused && !video.ended && video.readyState >= 2
+          ? getTimelineTimeOf(timing, video.currentTime)
+          : null,
+    });
 
     return () => {
       unsubscribe();
+      unregister();
       video.pause();
-      if (usePlaybackStore.getState().clockSource?.id === id) setClockSource(null);
     };
-  }, [ref, id, start, trimStart, trimEnd, isAudioSource]);
+  }, [ref, id, start, delay, trimStart, trimEnd, muted]);
 }

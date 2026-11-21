@@ -19,6 +19,7 @@ export function useStickerCrop() {
       const sticker = findSticker(id);
       if (!sticker) return;
       useUiStore.getState().setCropRect(null); // only one crop at a time
+      useUiStore.getState().setMediaCrop(null);
       useEditorStore.getState().select({ kind: 'element', id });
       setStickerCrop({ id, rect: sticker.crop });
     },

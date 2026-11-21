@@ -19,8 +19,7 @@ export function useCellGestures(
   const sizeRef = useRef(cellSize);
   sizeRef.current = cellSize;
 
-  const getItem = () =>
-    useEditorStore.getState().cells[index]?.find((item) => item.id === itemId);
+  const getItem = () => useEditorStore.getState().cells[index]?.find((item) => item.id === itemId);
 
   const apply = (update: (t: ImageTransform) => ImageTransform) => {
     const item = getItem();
