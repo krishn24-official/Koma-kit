@@ -1,4 +1,14 @@
-import type { BadgeElement, BoxFade, StickerElement, TextElement } from '@/types';
+import type {
+  BadgeElement,
+  BoxFade,
+  PictureEffects,
+  StickerAdjust,
+  StickerFade,
+  StickerGlow,
+  StickerShadow,
+  StickerElement,
+  TextElement,
+} from '@/types';
 import { createId } from '@/utils/id';
 import { DEFAULT_FONT_ID } from './fonts';
 
@@ -15,7 +25,28 @@ export const ELEMENT_LIMITS = {
 /** No cropping: the whole picture. */
 export const FULL_CROP = { x: 0, y: 0, w: 1, h: 1 } as const;
 
-const base = () => ({ id: createId(), x: 0.5, y: 0.5, rotation: 0, opacity: 1 });
+const base = () => ({
+  id: createId(),
+  x: 0.5,
+  y: 0.5,
+  rotation: 0,
+  opacity: 1,
+  hidden: false,
+  locked: false,
+});
+
+export const NO_FADE: StickerFade = { top: 0, bottom: 0, left: 0, right: 0 };
+export const DEFAULT_GLOW: StickerGlow = { color: '#a855f7', strength: 0, size: 40 };
+export const DEFAULT_SHADOW: StickerShadow = { strength: 0, blur: 30, distance: 12 };
+export const NO_ADJUST: StickerAdjust = { brightness: 1, contrast: 1, saturation: 1 };
+
+/** Fresh effects with everything off. */
+export const createEffects = (): PictureEffects => ({
+  fade: { ...NO_FADE },
+  glow: { ...DEFAULT_GLOW },
+  shadow: { ...DEFAULT_SHADOW },
+  adjust: { ...NO_ADJUST },
+});
 
 export const createText = (patch: Partial<TextElement> = {}): TextElement => ({
   ...base(),
@@ -43,6 +74,12 @@ export const createSticker = (patch: Partial<StickerElement> = {}): StickerEleme
   crop: { ...FULL_CROP },
   width: 300,
   label: 'Logo',
+  slotAspect: PLACEHOLDER_ASPECT,
+  flipX: false,
+  fade: { ...NO_FADE },
+  glow: { ...DEFAULT_GLOW },
+  shadow: { ...DEFAULT_SHADOW },
+  adjust: { ...NO_ADJUST },
   ...patch,
 });
 

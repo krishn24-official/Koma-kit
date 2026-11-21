@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { DESIGN_WIDTH } from '@/constants/canvasSizes';
 import { createSticker, FULL_CROP } from '@/constants/elements';
 import { useEditorStore } from '@/store/useEditorStore';
 import { useUiStore } from '@/store/useUiStore';
@@ -12,10 +13,9 @@ type StickerPicture = Pick<
 
 /** Reads a picture for a sticker (logo). Videos and unreadable files show an error. */
 async function readSticker(
-  files: File[],
+  file: File | undefined,
   showError: (message: string) => void,
 ): Promise<StickerPicture | null> {
-  const [file] = files;
   if (!file) return null;
   try {
     const media = await readMediaFile(file);
@@ -47,11 +47,45 @@ export function useStickerUpload() {
 
   return useCallback(
     async (id: string | null, files: File[]) => {
-      const picture = await readSticker(files, (message) => showToast(message, 'error'));
+      const picture = await readSticker(files[0], (message) => showToast(message, 'error'));
       if (!picture) return;
       const store = useEditorStore.getState();
       if (id) store.updateElement(id, picture);
       else store.addElement(createSticker({ ...picture, label: 'Picture' }));
+    },
+    [showToast],
+  );
+}
+
+/**
+ * Returns `add(files)`: adds every picture as its own piece, spread side by side
+ * across the canvas (for collages). Drag them into place afterwards.
+ */
+export function useAddPictures() {
+  const showToast = useUiStore((s) => s.showToast);
+
+  return useCallback(
+    async (files: File[]) => {
+      const pictures = (
+        await Promise.all(
+          files.map((file) => readSticker(file, (message) => showToast(message, 'error'))),
+        )
+      ).filter((p): p is StickerPicture => p !== null);
+      const n = pictures.length;
+      if (n === 0) return;
+      // Each piece gets an equal slice of the width, a bit wider so neighbours overlap.
+      const width = Math.round(Math.min(520, Math.max(220, (DESIGN_WIDTH / n) * 1.3)));
+      useEditorStore.getState().addElements(
+        pictures.map((picture, i) =>
+          createSticker({
+            ...picture,
+            label: 'Picture',
+            width,
+            x: (i + 0.5) / n,
+            y: 0.55,
+          }),
+        ),
+      );
     },
     [showToast],
   );

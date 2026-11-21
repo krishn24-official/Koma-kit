@@ -29,6 +29,7 @@ import type {
   LayoutNode,
   Selection,
   BoxFade,
+  PictureEffects,
   CanvasElement,
 } from '@/types';
 import { clamp } from '@/utils/math';
@@ -53,6 +54,8 @@ export interface EditorState {
   cells: Record<number, CellMedia[]>;
   /** Box fades (color gradients over a box), by box number. */
   boxFades: Record<number, BoxFade>;
+  /** Fade edges, glow, shadow and colors per box; like fades, they stay with the box. */
+  boxEffects: Record<number, PictureEffects>;
   /** Text, stickers and badges placed freely on the canvas, bottom to top. */
   elements: CanvasElement[];
   selection: Selection;
@@ -123,7 +126,12 @@ export interface EditorActions {
   duplicateElement: (id: string) => void;
   /** Moves an element one step up (+1) or down (-1) in the stacking order. */
   moveElement: (id: string, step: 1 | -1) => void;
+  /** Brings an element in front of all others, or sends it behind all others. */
+  moveElementToEnd: (id: string, end: 'front' | 'back') => void;
+  /** Adds several elements at once and selects the last one. */
+  addElements: (elements: CanvasElement[]) => void;
   setBoxFade: (index: number, fade: BoxFade | null) => void;
+  setBoxEffects: (index: number, effects: PictureEffects | null) => void;
   /** Replaces the whole design with a starter template. */
   loadTemplate: (design: TemplateDesign) => void;
 
@@ -137,7 +145,14 @@ export type EditorStore = EditorState & EditorActions;
 export type TemplateDesign = Partial<
   Pick<
     EditorState,
-    'layoutRoot' | 'presetId' | 'canvasSize' | 'style' | 'boxFades' | 'elements' | 'cells'
+    | 'layoutRoot'
+    | 'presetId'
+    | 'canvasSize'
+    | 'style'
+    | 'boxFades'
+    | 'boxEffects'
+    | 'elements'
+    | 'cells'
   >
 >;
 
@@ -157,6 +172,7 @@ const createInitialState = (): EditorState => ({
   style: { ...DEFAULT_STYLE },
   cells: {},
   boxFades: {},
+  boxEffects: {},
   elements: [],
   selection: null,
   swapSource: null,
@@ -195,16 +211,19 @@ function growLayout(s: EditorState, layoutRoot: LayoutNode): Partial<EditorState
 
   const cells = { ...s.cells };
   const boxFades = { ...s.boxFades };
+  const boxEffects = { ...s.boxEffects };
   for (let i = before; i < after; i++) {
     (cells[i] ?? []).forEach(revokeMedia);
     delete cells[i];
     delete boxFades[i];
+    delete boxEffects[i];
   }
   return {
     layoutRoot,
     presetId: null,
     cells,
     boxFades,
+    boxEffects,
     swapSource: null,
   };
 }
@@ -248,12 +267,19 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
         if (i !== index) boxFades[i > index ? i - 1 : i] = fade;
       }
 
+      const boxEffects: Record<number, PictureEffects> = {};
+      for (const [key, effects] of Object.entries(s.boxEffects)) {
+        const i = Number(key);
+        if (i !== index) boxEffects[i > index ? i - 1 : i] = effects;
+      }
+
       const remaining = countCells(layoutRoot);
       return {
         layoutRoot,
         presetId: null,
         cells,
         boxFades,
+        boxEffects,
         swapSource: null,
         selection: remaining > 0 ? { kind: 'cell', index: Math.min(index, remaining - 1) } : null,
       };
@@ -545,6 +571,32 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
       const elements = [...s.elements];
       [elements[from], elements[to]] = [elements[to]!, elements[from]!];
       return { elements };
+    }),
+
+  moveElementToEnd: (id, end) =>
+    set((s) => {
+      const el = s.elements.find((e) => e.id === id);
+      if (!el) return {};
+      const rest = s.elements.filter((e) => e.id !== id);
+      return { elements: end === 'front' ? [...rest, el] : [el, ...rest] };
+    }),
+
+  addElements: (added) =>
+    set((s) => {
+      const last = added[added.length - 1];
+      if (!last) return {};
+      return {
+        elements: [...s.elements, ...added],
+        selection: { kind: 'element', id: last.id },
+      };
+    }),
+
+  setBoxEffects: (index, effects) =>
+    set((s) => {
+      const boxEffects = { ...s.boxEffects };
+      if (effects) boxEffects[index] = effects;
+      else delete boxEffects[index];
+      return { boxEffects };
     }),
 
   setBoxFade: (index, fade) =>

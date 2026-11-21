@@ -72,7 +72,13 @@ export function TemplateCanvas() {
             <CanvasBackground style={style} unit={unit} />
 
             {rects.map((rect, index) => (
-              <GridCell key={index} index={index} rect={rect} radius={style.radius * unit} />
+              <GridCell
+                key={index}
+                index={index}
+                rect={rect}
+                radius={style.radius * unit}
+                unit={unit}
+              />
             ))}
 
             <LayoutDividers canvasSize={canvasSize} padding={style.padding * unit} />

@@ -456,7 +456,7 @@ export function CellToolbar() {
   } else if (selection?.kind === 'element') {
     content = (
       <div className="flex items-center gap-3">
-        <Hint>Drag to move, drag the corner dot to resize. More options in Elements.</Hint>
+        <Hint>Drag to move. Drag a corner dot or pinch to resize.</Hint>
         {selectedIsPicture && (
           <Button size="sm" icon={<CropIcon />} onClick={() => stickerCrop.start(selection.id)}>
             Crop

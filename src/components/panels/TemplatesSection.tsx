@@ -1,4 +1,3 @@
-import { Newspaper } from 'lucide-react';
 import { PanelSection } from '@/components/ui/PanelSection';
 import { STARTER_TEMPLATES, type StarterTemplate } from '@/constants/templates';
 import { useEditorStore } from '@/store/useEditorStore';
@@ -23,22 +22,22 @@ export function TemplatesSection() {
     usePlaybackStore.getState().seek(0);
     loadTemplate(template.build());
     useEditorStore.getState().select({ kind: 'cell', index: 0 });
-    showToast('Tap the box for the art and the dashed slots for logos', 'info');
+    showToast(template.hint, 'info');
   };
 
   return (
     <PanelSection title="Starter templates">
       <div className="space-y-2">
-        {STARTER_TEMPLATES.map((template) => (
+        {STARTER_TEMPLATES.map(({ icon: Icon, ...template }) => (
           <button
             key={template.id}
             type="button"
-            onClick={() => apply(template)}
+            onClick={() => apply({ icon: Icon, ...template })}
             title={template.description}
             className="flex w-full items-center gap-3 rounded-xl border border-neutral-800 p-3 text-left transition-colors hover:border-brand-500 hover:bg-brand-500/5"
           >
             <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-brand-500/15 text-brand-400">
-              <Newspaper className="size-5" aria-hidden />
+              <Icon className="size-5" aria-hidden />
             </span>
             <span className="flex min-w-0 items-baseline gap-2">
               <span className="text-sm font-semibold text-neutral-100">{template.name}</span>

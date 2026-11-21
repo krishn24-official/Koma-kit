@@ -1,5 +1,5 @@
 import type { BadgeElement, CanvasElement, Size, StickerElement, TextElement } from '@/types';
-import { stickerHeight } from './elements';
+import { renderStickerLayer } from './pictureEffects';
 import { getBadgeRenderStyle, getTextRenderStyle } from './textStyle';
 
 type Ctx = CanvasRenderingContext2D;
@@ -66,11 +66,9 @@ function drawSticker(
   image: CanvasImageSource | undefined,
 ) {
   if (!sticker.src || !image) return; // empty placeholders aren't exported
-  const w = sticker.width * unit;
-  const h = stickerHeight(sticker) * unit;
-  const { crop, naturalWidth: nw, naturalHeight: nh } = sticker;
-  // Source rectangle = the cropped part of the picture.
-  ctx.drawImage(image, crop.x * nw, crop.y * nh, crop.w * nw, crop.h * nh, -w / 2, -h / 2, w, h);
+  // Cropped, flipped, color-adjusted, faded, with glow and shadow.
+  const layer = renderStickerLayer(sticker, image, unit);
+  ctx.drawImage(layer.canvas, layer.x, layer.y);
 }
 
 function drawBadge(ctx: Ctx, badge: BadgeElement, unit: number) {
@@ -119,6 +117,7 @@ export function drawElements(
   stickers: Map<string, CanvasImageSource>,
 ): void {
   for (const el of elements) {
+    if (el.hidden) continue;
     ctx.save();
     ctx.globalAlpha = el.opacity;
     ctx.translate(el.x * size.width, el.y * size.height);

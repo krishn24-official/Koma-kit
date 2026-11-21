@@ -4,6 +4,7 @@ import type {
   CanvasElement,
   CanvasStyle,
   CellMedia,
+  PictureEffects,
   PixelRect,
   ResolvedLayout,
   Size,
@@ -14,6 +15,15 @@ import { elementFonts } from './elements';
 import { getImageRect, getImageSize } from './imageTransform';
 import { getCellRects } from './layoutMath';
 import { loadImage, loadVideoFrame, releaseVideo, sourceSize } from './media';
+import {
+  addOutline,
+  applyAdjust,
+  applyFade,
+  hasAdjust,
+  hasEffects,
+  hasFade,
+  makeCanvas,
+} from './pictureEffects';
 import { getActiveItem, getVideoLocalTime } from './timeline';
 
 export interface TemplateSnapshot {
@@ -22,6 +32,7 @@ export interface TemplateSnapshot {
   style: CanvasStyle;
   cells: Record<number, CellMedia[]>;
   boxFades: Record<number, BoxFade>;
+  boxEffects: Record<number, PictureEffects>;
   elements: CanvasElement[];
 }
 
@@ -48,6 +59,60 @@ function traceRoundedRect(ctx: CanvasRenderingContext2D, rect: PixelRect, radius
   ctx.arcTo(x, y + h, x, y, r);
   ctx.arcTo(x, y, x + w, y, r);
   ctx.closePath();
+}
+
+/** Draws a box's picture/frame (cropped, zoomed, panned) into `rect`. Call inside its clip. */
+function drawMedia(
+  ctx: CanvasRenderingContext2D,
+  rect: PixelRect,
+  item: CellMedia,
+  source: CanvasImageSource,
+): void {
+  const drawRect = getImageRect(getImageSize(item), rect, item.transform);
+  // Source rectangle = the cropped part of the picture/frame.
+  const src = sourceSize(source);
+  const { crop } = item;
+  ctx.drawImage(
+    source,
+    crop.x * src.width,
+    crop.y * src.height,
+    crop.w * src.width,
+    crop.h * src.height,
+    rect.x + drawRect.x,
+    rect.y + drawRect.y,
+    drawRect.width,
+    drawRect.height,
+  );
+}
+
+/**
+ * A box with effects, drawn on its own canvas in the same order as the preview:
+ * picture → colors → color fade → edges fading out → glow → shadow.
+ */
+function drawBoxWithEffects(
+  ctx: CanvasRenderingContext2D,
+  rect: PixelRect,
+  radius: number,
+  item: CellMedia,
+  source: CanvasImageSource,
+  fade: BoxFade | undefined,
+  effects: PictureEffects,
+  unit: number,
+): void {
+  const w = Math.max(1, Math.round(rect.width));
+  const h = Math.max(1, Math.round(rect.height));
+  const local: PixelRect = { x: 0, y: 0, width: w, height: h };
+  const box = makeCanvas(w, h);
+  box.ctx.imageSmoothingEnabled = true;
+  box.ctx.imageSmoothingQuality = 'high';
+  traceRoundedRect(box.ctx, local, radius);
+  box.ctx.clip();
+  drawMedia(box.ctx, local, item, source);
+  if (hasAdjust(effects.adjust)) applyAdjust(box.ctx, w, h, effects.adjust);
+  if (fade) drawBoxFade(box.ctx, local, fade);
+  if (hasFade(effects.fade)) applyFade(box.ctx, w, h, effects.fade);
+  const outlined = addOutline(box.canvas, effects, unit);
+  ctx.drawImage(outlined.canvas, rect.x - outlined.offset, rect.y - outlined.offset);
 }
 
 /**
@@ -93,7 +158,7 @@ export function drawTemplate(
   resolve: MediaResolver,
   assets: DrawAssets,
 ): void {
-  const { layout, aspectRatio, style, cells, boxFades, elements } = snapshot;
+  const { layout, aspectRatio, style, cells, boxFades, boxEffects, elements } = snapshot;
   const unit = size.width / aspectRatio.width;
   const rects = getCellRects(layout.cells, size, style, unit);
 
@@ -106,27 +171,16 @@ export function drawTemplate(
     const source = item ? resolve(item) : null;
     const fade = boxFades[i];
     if (!(item && source) && !fade) return;
+    const effects = boxEffects[i];
+    if (item && source && effects && hasEffects(effects)) {
+      drawBoxWithEffects(ctx, rect, style.radius * unit, item, source, fade, effects, unit);
+      return;
+    }
 
     ctx.save();
     traceRoundedRect(ctx, rect, style.radius * unit);
     ctx.clip();
-    if (item && source) {
-      const drawRect = getImageRect(getImageSize(item), rect, item.transform);
-      // Source rectangle = the cropped part of the picture/frame.
-      const src = sourceSize(source);
-      const { crop } = item;
-      ctx.drawImage(
-        source,
-        crop.x * src.width,
-        crop.y * src.height,
-        crop.w * src.width,
-        crop.h * src.height,
-        rect.x + drawRect.x,
-        rect.y + drawRect.y,
-        drawRect.width,
-        drawRect.height,
-      );
-    }
+    if (item && source) drawMedia(ctx, rect, item, source);
     if (fade) drawBoxFade(ctx, rect, fade);
     ctx.restore();
   });
