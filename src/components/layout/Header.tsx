@@ -1,7 +1,8 @@
-import { Download, RotateCcw } from 'lucide-react';
+import { Download, RotateCcw, Save } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useEditorStore } from '@/store/useEditorStore';
 import { usePlaybackStore } from '@/store/usePlaybackStore';
+import { useTemplatesStore } from '@/store/useTemplatesStore';
 import { useUiStore } from '@/store/useUiStore';
 import { Logo } from './Logo';
 
@@ -14,6 +15,7 @@ export function Header() {
     usePlaybackStore.getState().pause();
     usePlaybackStore.getState().seek(0);
     resetProject();
+    useTemplatesStore.getState().clearCurrent();
   };
 
   return (
@@ -23,6 +25,16 @@ export function Header() {
         <Button variant="ghost" size="sm" icon={<RotateCcw />} onClick={handleReset}>
           <span className="hidden sm:inline">Reset</span>
           <span className="sr-only sm:hidden">Reset</span>
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={<Save />}
+          aria-haspopup="dialog"
+          onClick={() => useTemplatesStore.getState().setSaveDialogOpen(true)}
+        >
+          <span className="hidden sm:inline">Save</span>
+          <span className="sr-only sm:hidden">Save template</span>
         </Button>
         <Button
           variant="primary"

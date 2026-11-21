@@ -1,4 +1,5 @@
 import { DownloadDialog } from '@/components/download/DownloadDialog';
+import { SaveTemplateDialog } from '@/components/templates/SaveTemplateDialog';
 import { CellToolbar } from '@/components/editor/CellToolbar';
 import { Workspace } from '@/components/editor/Workspace';
 import { Header } from '@/components/layout/Header';
@@ -29,6 +30,7 @@ export default function App() {
         </main>
       </div>
       <DownloadDialog />
+      <SaveTemplateDialog />
       <Toast />
       <ExportProgress />
     </div>

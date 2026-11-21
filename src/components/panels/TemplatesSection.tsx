@@ -2,6 +2,7 @@ import { PanelSection } from '@/components/ui/PanelSection';
 import { STARTER_TEMPLATES, type StarterTemplate } from '@/constants/templates';
 import { useEditorStore } from '@/store/useEditorStore';
 import { usePlaybackStore } from '@/store/usePlaybackStore';
+import { useTemplatesStore } from '@/store/useTemplatesStore';
 import { useUiStore } from '@/store/useUiStore';
 
 /** One-tap starting points that set up the whole design. */
@@ -21,6 +22,7 @@ export function TemplatesSection() {
     usePlaybackStore.getState().pause();
     usePlaybackStore.getState().seek(0);
     loadTemplate(template.build());
+    useTemplatesStore.getState().clearCurrent();
     useEditorStore.getState().select({ kind: 'cell', index: 0 });
     showToast(template.hint, 'info');
   };
