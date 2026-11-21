@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useTimelineDuration } from '@/store/selectors';
-import { getCurrentDuration, usePlaybackStore } from '@/store/usePlaybackStore';
+import { getCurrentDuration, readClock, usePlaybackStore } from '@/store/usePlaybackStore';
 
 /**
  * Advances the timeline while playing. Mount once, at the app root.
@@ -31,9 +31,9 @@ export function usePlaybackLoop() {
       const dt = (now - last) / 1000;
       last = now;
 
-      const { currentTime, clockSource } = usePlaybackStore.getState();
+      const { currentTime } = usePlaybackStore.getState();
       const end = getCurrentDuration();
-      const next = clockSource?.read() ?? currentTime + dt;
+      const next = readClock() ?? currentTime + dt;
 
       if (next >= end) {
         usePlaybackStore.setState({ currentTime: end, isPlaying: false });

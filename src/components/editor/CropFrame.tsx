@@ -137,14 +137,35 @@ export function CropFrame({
         </div>
 
         <div {...bind('top')} className={cn(edge, '-top-3 right-6 left-6 h-6 cursor-ns-resize')} />
-        <div {...bind('bottom')} className={cn(edge, 'right-6 -bottom-3 left-6 h-6 cursor-ns-resize')} />
-        <div {...bind('left')} className={cn(edge, 'top-6 bottom-6 -left-3 w-6 cursor-ew-resize')} />
-        <div {...bind('right')} className={cn(edge, 'top-6 -right-3 bottom-6 w-6 cursor-ew-resize')} />
+        <div
+          {...bind('bottom')}
+          className={cn(edge, 'right-6 -bottom-3 left-6 h-6 cursor-ns-resize')}
+        />
+        <div
+          {...bind('left')}
+          className={cn(edge, 'top-6 bottom-6 -left-3 w-6 cursor-ew-resize')}
+        />
+        <div
+          {...bind('right')}
+          className={cn(edge, 'top-6 -right-3 bottom-6 w-6 cursor-ew-resize')}
+        />
 
-        <div {...bind('tl')} className={cn(corner, '-top-1 -left-1 cursor-nwse-resize border-t-4 border-l-4')} />
-        <div {...bind('tr')} className={cn(corner, '-top-1 -right-1 cursor-nesw-resize border-t-4 border-r-4')} />
-        <div {...bind('bl')} className={cn(corner, '-bottom-1 -left-1 cursor-nesw-resize border-b-4 border-l-4')} />
-        <div {...bind('br')} className={cn(corner, '-right-1 -bottom-1 cursor-nwse-resize border-r-4 border-b-4')} />
+        <div
+          {...bind('tl')}
+          className={cn(corner, '-top-1 -left-1 cursor-nwse-resize border-t-4 border-l-4')}
+        />
+        <div
+          {...bind('tr')}
+          className={cn(corner, '-top-1 -right-1 cursor-nesw-resize border-t-4 border-r-4')}
+        />
+        <div
+          {...bind('bl')}
+          className={cn(corner, '-bottom-1 -left-1 cursor-nesw-resize border-b-4 border-l-4')}
+        />
+        <div
+          {...bind('br')}
+          className={cn(corner, '-right-1 -bottom-1 cursor-nwse-resize border-r-4 border-b-4')}
+        />
 
         {label && (
           <div className="pointer-events-none absolute top-2 left-1/2 -translate-x-1/2 rounded-full bg-black/80 px-3 py-1 text-xs font-medium whitespace-nowrap text-white tabular-nums">

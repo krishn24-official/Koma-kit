@@ -4,6 +4,7 @@ import { createId } from '@/utils/id';
 import {
   DEFAULT_EXPORT_OPTIONS,
   DEFAULT_STYLE,
+  DEFAULT_TRANSFORM,
   EXPORT_SCALES,
 } from '@/constants/editor';
 import { DEFAULT_LAYOUT_ID, getPreset, MAX_CELLS } from '@/constants/layouts';
@@ -50,8 +51,6 @@ export interface EditorState {
    * started. Cells beyond the current layout are kept, so switching back restores them.
    */
   cells: Record<number, CellMedia[]>;
-  /** Video whose original audio is played in the preview and saved in the MP4. */
-  audioSourceId: string | null;
   /** Box fades (color gradients over a box), by box number. */
   boxFades: Record<number, BoxFade>;
   /** Text, stickers and badges placed freely on the canvas, bottom to top. */
@@ -103,7 +102,12 @@ export interface EditorActions {
     itemId: string,
     trim: { trimStart?: number; trimEnd?: number },
   ) => void;
-  setAudioSource: (itemId: string | null) => void;
+  /** Seconds a video waits on its first frame before playing (0 = plays right away). */
+  setItemDelay: (index: number, itemId: string, delay: number) => void;
+  /** Crops a box's picture/clip; it is then re-fitted to fill its box. */
+  setItemCrop: (index: number, itemId: string, crop: CellRect) => void;
+  /** Leaves a video's sound out (true) or puts it back (false). */
+  setItemMuted: (index: number, itemId: string, muted: boolean) => void;
 
   startSwap: (index: number) => void;
   cancelSwap: () => void;
@@ -152,7 +156,6 @@ const createInitialState = (): EditorState => ({
   canvasSize: DEFAULT_CANVAS_SIZE,
   style: { ...DEFAULT_STYLE },
   cells: {},
-  audioSourceId: null,
   boxFades: {},
   elements: [],
   selection: null,
@@ -182,24 +185,6 @@ function withItems(
 }
 
 /**
- * Keeps the audio source valid:
- * - the current source stays if it still exists;
- * - if it was removed, the first remaining video takes over;
- * - if there was none, the first newly added video becomes the source.
- *   (When the user mutes all audio, it stays muted until they add another video.)
- */
-function nextAudioSource(
-  current: string | null,
-  cells: Record<number, CellMedia[]>,
-  added: CellMedia[] = [],
-): string | null {
-  const items = allItems(cells);
-  if (current && items.some((item) => item.id === current)) return current;
-  const firstVideo = (list: CellMedia[]) => list.find((item) => item.kind === 'video')?.id ?? null;
-  return current ? firstVideo(items) : firstVideo(added);
-}
-
-/**
  * State update for a layout that gained boxes. New boxes always start empty: any media
  * left over at those numbers from an earlier, bigger layout is dropped.
  */
@@ -220,7 +205,6 @@ function growLayout(s: EditorState, layoutRoot: LayoutNode): Partial<EditorState
     presetId: null,
     cells,
     boxFades,
-    audioSourceId: nextAudioSource(s.audioSourceId, cells),
     swapSource: null,
   };
 }
@@ -270,7 +254,6 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
         presetId: null,
         cells,
         boxFades,
-        audioSourceId: nextAudioSource(s.audioSourceId, cells),
         swapSource: null,
         selection: remaining > 0 ? { kind: 'cell', index: Math.min(index, remaining - 1) } : null,
       };
@@ -330,7 +313,6 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
       const cells = withItems(s.cells, index, [{ ...media, start: 0 }]);
       return {
         cells,
-        audioSourceId: nextAudioSource(s.audioSourceId, cells, [media]),
         selection: { kind: 'cell', index },
       };
     }),
@@ -346,7 +328,7 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
         index,
         items.map((item) => (item.id === itemId ? { ...media, start: old.start } : item)),
       );
-      return { cells, audioSourceId: nextAudioSource(s.audioSourceId, cells, [media]) };
+      return { cells };
     }),
 
   addItemAt: (index, media, start) =>
@@ -360,13 +342,12 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
       const cells = withItems(s.cells, index, sortByStart([...rest, { ...media, start: time }]));
       return {
         cells,
-        audioSourceId: nextAudioSource(s.audioSourceId, cells, [media]),
         selection: { kind: 'cell', index },
       };
     }),
 
   fillEmptyCells: (newMedia) => {
-    const { cells, layoutRoot, audioSourceId } = get();
+    const { cells, layoutRoot } = get();
     const cellCount = countCells(layoutRoot);
     let next = cells;
     let placed = 0;
@@ -381,7 +362,6 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
     newMedia.slice(placed).forEach(revokeMedia);
     set({
       cells: next,
-      audioSourceId: nextAudioSource(audioSourceId, next, newMedia.slice(0, placed)),
     });
     return placed;
   },
@@ -395,13 +375,13 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
         index,
         items.filter((item) => item.id !== itemId),
       );
-      return { cells, audioSourceId: nextAudioSource(s.audioSourceId, cells) };
+      return { cells };
     }),
 
   clearMedia: () =>
     set((s) => {
       allItems(s.cells).forEach(revokeMedia);
-      return { cells: {}, audioSourceId: null, selection: null, swapSource: null };
+      return { cells: {}, selection: null, swapSource: null };
     }),
 
   updateItemTransform: (index, itemId, transform) =>
@@ -449,7 +429,50 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
       };
     }),
 
-  setAudioSource: (audioSourceId) => set({ audioSourceId }),
+  setItemDelay: (index, itemId, delay) =>
+    set((s) => {
+      const items = s.cells[index];
+      if (!items) return {};
+      return {
+        cells: withItems(
+          s.cells,
+          index,
+          items.map((item) =>
+            item.id === itemId && item.kind === 'video'
+              ? { ...item, delay: Math.max(0, delay) }
+              : item,
+          ),
+        ),
+      };
+    }),
+
+  setItemCrop: (index, itemId, crop) =>
+    set((s) => {
+      const items = s.cells[index];
+      if (!items) return {};
+      return {
+        cells: withItems(
+          s.cells,
+          index,
+          items.map((item) =>
+            item.id === itemId ? { ...item, crop, transform: { ...DEFAULT_TRANSFORM } } : item,
+          ),
+        ),
+      };
+    }),
+
+  setItemMuted: (index, itemId, muted) =>
+    set((s) => {
+      const items = s.cells[index];
+      if (!items) return {};
+      return {
+        cells: withItems(
+          s.cells,
+          index,
+          items.map((item) => (item.id === itemId ? { ...item, muted } : item)),
+        ),
+      };
+    }),
 
   startSwap: (index) => set({ swapSource: index }),
   cancelSwap: () => set({ swapSource: null }),
@@ -545,8 +568,7 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
     });
   },
 
-  updateExportOptions: (patch) =>
-    set((s) => ({ exportOptions: { ...s.exportOptions, ...patch } })),
+  updateExportOptions: (patch) => set((s) => ({ exportOptions: { ...s.exportOptions, ...patch } })),
 
   resetProject: () => {
     const { exportOptions } = get();

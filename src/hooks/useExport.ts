@@ -126,8 +126,10 @@ export function useExport() {
       run('download', 'Export failed. Please try again', async () => {
         const { file, warning } = await createFile();
         downloadBlob(file, file.name);
-        showToast(warning ?? (file.type === 'video/mp4' ? 'Video downloaded' : 'Image downloaded'),
-          warning ? 'info' : 'success');
+        showToast(
+          warning ?? (file.type === 'video/mp4' ? 'Video downloaded' : 'Image downloaded'),
+          warning ? 'info' : 'success',
+        );
       }),
     [run, createFile, showToast],
   );

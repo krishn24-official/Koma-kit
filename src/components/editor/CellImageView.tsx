@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { useCellGestures } from '@/hooks/useCellGestures';
 import type { CellMedia, Size } from '@/types';
-import { getImageRect, getImageSize } from '@/utils/imageTransform';
+import { getCroppedMediaLayout } from '@/utils/imageTransform';
 
 interface CellImageViewProps {
   index: number;
@@ -14,17 +14,23 @@ export function CellImageView({ index, item, size }: CellImageViewProps) {
   const ref = useRef<HTMLDivElement>(null);
   useCellGestures(ref, index, item.id, size);
 
-  const rect = getImageRect(getImageSize(item), size, item.transform);
+  const { frame, media } = getCroppedMediaLayout(item, size);
 
   return (
     <div ref={ref} className="absolute inset-0 cursor-grab touch-none active:cursor-grabbing">
-      <img
-        src={item.src}
-        alt={item.fileName}
-        draggable={false}
-        className="pointer-events-none absolute max-w-none select-none"
-        style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height }}
-      />
+      {/* Clipping frame = the cropped part; the full picture is shifted inside it. */}
+      <div
+        className="pointer-events-none absolute overflow-hidden"
+        style={{ left: frame.x, top: frame.y, width: frame.width, height: frame.height }}
+      >
+        <img
+          src={item.src}
+          alt={item.fileName}
+          draggable={false}
+          className="absolute max-w-none select-none"
+          style={media}
+        />
+      </div>
     </div>
   );
 }

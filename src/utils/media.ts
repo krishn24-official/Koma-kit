@@ -1,4 +1,5 @@
 import { DEFAULT_TRANSFORM } from '@/constants/editor';
+import { FULL_CROP } from '@/constants/elements';
 import type { CellMedia } from '@/types';
 import { createId } from './id';
 
@@ -98,6 +99,9 @@ export async function readMediaFile(file: File): Promise<CellMedia> {
     file,
     fileName: file.name,
     start: 0,
+    delay: 0,
+    muted: false,
+    crop: { ...FULL_CROP },
     transform: { ...DEFAULT_TRANSFORM },
   };
 
@@ -134,3 +138,17 @@ export async function readMediaFile(file: File): Promise<CellMedia> {
 export const revokeMedia = (media: CellMedia | undefined): void => {
   if (media) URL.revokeObjectURL(media.src);
 };
+
+/** Pixel size of anything drawable on a canvas (image, video frame, canvas). */
+export function sourceSize(source: CanvasImageSource): { width: number; height: number } {
+  if (source instanceof HTMLImageElement) {
+    return { width: source.naturalWidth, height: source.naturalHeight };
+  }
+  if (source instanceof HTMLVideoElement) {
+    return { width: source.videoWidth, height: source.videoHeight };
+  }
+  if ('width' in source && typeof source.width === 'number') {
+    return { width: source.width, height: (source as { height: number }).height };
+  }
+  return { width: 0, height: 0 };
+}

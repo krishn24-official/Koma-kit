@@ -95,17 +95,34 @@ function fadeStops(fade: BoxFade): { direction: FadeDirection; stops: Array<[num
   const reach = Math.max(0.001, fade.reach);
   switch (fade.from) {
     case 'full':
-      return { direction: 'to right', stops: [[0, op], [1, op]] };
+      return {
+        direction: 'to right',
+        stops: [
+          [0, op],
+          [1, op],
+        ],
+      };
     case 'sides':
       return {
         direction: 'to right',
-        stops: [[0, op], [reach / 2, 0], [1 - reach / 2, 0], [1, op]],
+        stops: [
+          [0, op],
+          [reach / 2, 0],
+          [1 - reach / 2, 0],
+          [1, op],
+        ],
       };
     default: {
-      const direction = ({ left: 'to right', right: 'to left', top: 'to bottom', bottom: 'to top' } as const)[
-        fade.from
-      ];
-      return { direction, stops: [[0, op], [reach, 0]] };
+      const direction = (
+        { left: 'to right', right: 'to left', top: 'to bottom', bottom: 'to top' } as const
+      )[fade.from];
+      return {
+        direction,
+        stops: [
+          [0, op],
+          [reach, 0],
+        ],
+      };
     }
   }
 }

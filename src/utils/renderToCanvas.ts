@@ -13,7 +13,7 @@ import { drawElements } from './drawElements';
 import { elementFonts } from './elements';
 import { getImageRect, getImageSize } from './imageTransform';
 import { getCellRects } from './layoutMath';
-import { loadImage, loadVideoFrame, releaseVideo } from './media';
+import { loadImage, loadVideoFrame, releaseVideo, sourceSize } from './media';
 import { getActiveItem, getVideoLocalTime } from './timeline';
 
 export interface TemplateSnapshot {
@@ -23,7 +23,6 @@ export interface TemplateSnapshot {
   cells: Record<number, CellMedia[]>;
   boxFades: Record<number, BoxFade>;
   elements: CanvasElement[];
-  audioSourceId: string | null;
 }
 
 /** Returns something drawable for an item (image, video frame, decoded canvas). */
@@ -113,8 +112,15 @@ export function drawTemplate(
     ctx.clip();
     if (item && source) {
       const drawRect = getImageRect(getImageSize(item), rect, item.transform);
+      // Source rectangle = the cropped part of the picture/frame.
+      const src = sourceSize(source);
+      const { crop } = item;
       ctx.drawImage(
         source,
+        crop.x * src.width,
+        crop.y * src.height,
+        crop.w * src.width,
+        crop.h * src.height,
         rect.x + drawRect.x,
         rect.y + drawRect.y,
         drawRect.width,

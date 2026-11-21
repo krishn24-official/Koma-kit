@@ -26,7 +26,7 @@ export function Workspace() {
   const handlePointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest('[data-canvas-area]')) return;
     const ui = useUiStore.getState();
-    if (ui.cropRect || ui.stickerCrop) return; // keep the crop open until Apply/Cancel
+    if (ui.cropRect || ui.stickerCrop || ui.mediaCrop) return; // keep a crop open until Apply/Cancel
     ui.closeMobilePanel();
     useEditorStore.getState().clearSelection();
   };

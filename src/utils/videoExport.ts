@@ -3,8 +3,8 @@
  * someone exports a video.
  *
  * Every frame is drawn with the same `drawTemplate` used for still images. Frames are
- * encoded to H.264 with WebCodecs, and the original audio of the chosen video is
- * re-encoded (AAC when available) and muxed alongside.
+ * encoded to H.264 with WebCodecs. The original sound of every unmuted video is mixed
+ * into one soundtrack, re-encoded (AAC when available) and muxed alongside.
  */
 import {
   ALL_FORMATS,
@@ -26,14 +26,11 @@ import {
 } from 'mediabunny';
 import type { CellMedia } from '@/types';
 import { loadImage } from './media';
-import {
-  drawTemplate,
-  loadDrawAssets,
-  type TemplateSnapshot,
-} from './renderToCanvas';
+import { drawTemplate, loadDrawAssets, type TemplateSnapshot } from './renderToCanvas';
 import {
   getActiveItem,
   getPlayLength,
+  getPlayStart,
   getTimelineDuration,
   getVideoLocalTime,
 } from './timeline';
@@ -68,7 +65,7 @@ export async function exportVideo(
   snapshot: TemplateSnapshot,
   options: VideoExportOptions,
 ): Promise<VideoExportResult> {
-  const { layout, aspectRatio, cells, audioSourceId } = snapshot;
+  const { layout, aspectRatio, cells } = snapshot;
   const { fps, signal } = options;
   const cellCount = layout.cells.length;
 
@@ -153,33 +150,34 @@ export async function exportVideo(
     const videoSource = new CanvasSource(canvas, { codec: 'avc', bitrate: QUALITY_HIGH });
     output.addVideoTrack(videoSource, { frameRate: fps });
 
-    // Audio: the chosen video's original sound, placed at the time the video starts.
+    // Audio: the sound of every unmuted video, each placed where it plays, mixed together.
     let writeAudio: (() => Promise<void>) | null = null;
-    const audioItem = visibleItems.find(
-      (item) => item.id === audioSourceId && item.kind === 'video',
-    );
-    if (audioItem) {
-      const track = await openInput(audioItem.file).getPrimaryAudioTrack();
-      if (!track) {
-        warning = 'The selected video has no sound';
-      } else if (!(await track.canDecode())) {
-        warning = "This browser can't read the video's sound, so the MP4 is silent";
-      } else {
-        const codec = await getFirstEncodableAudioCodec(['aac', 'opus'], {
-          numberOfChannels: track.numberOfChannels,
-          sampleRate: track.sampleRate,
-          bitrate: QUALITY_MEDIUM,
-        });
-        if (!codec) {
-          warning = "This browser can't encode sound, so the MP4 is silent";
-        } else {
-          if (codec !== 'aac') warning = 'Sound was saved as Opus; some apps may not play it';
-          const audioSource = new AudioBufferSource({ codec, bitrate: QUALITY_MEDIUM });
-          output.addAudioTrack(audioSource);
-          const cellItems = visibleCells.find((items) => items.includes(audioItem)) ?? [];
-          writeAudio = () =>
-            writeAudioTrack(audioSource, track, audioItem, cellItems, duration, signal);
+    const audioClips: AudioClip[] = [];
+    for (const items of visibleCells) {
+      for (const item of items) {
+        if (item.kind !== 'video' || item.muted) continue;
+        const track = await openInput(item.file).getPrimaryAudioTrack();
+        if (!track) continue; // a clip without sound
+        if (!(await track.canDecode())) {
+          warning = "This browser can't read some clips' sound, so they are silent";
+          continue;
         }
+        audioClips.push({ item, track, cellItems: items });
+      }
+    }
+    if (audioClips.length > 0) {
+      const codec = await getFirstEncodableAudioCodec(['aac', 'opus'], {
+        numberOfChannels: MIX_CHANNELS,
+        sampleRate: MIX_SAMPLE_RATE,
+        bitrate: QUALITY_MEDIUM,
+      });
+      if (!codec) {
+        warning = "This browser can't encode sound, so the MP4 is silent";
+      } else {
+        if (codec !== 'aac') warning = 'Sound was saved as Opus; some apps may not play it';
+        const audioSource = new AudioBufferSource({ codec, bitrate: QUALITY_MEDIUM });
+        output.addAudioTrack(audioSource);
+        writeAudio = () => writeMixedAudio(audioSource, audioClips, duration, signal);
       }
     }
 
@@ -236,40 +234,110 @@ export async function exportVideo(
   }
 }
 
-async function writeAudioTrack(
-  source: AudioBufferSource,
+/** A video whose sound goes into the mix. */
+interface AudioClip {
+  item: CellMedia;
+  track: InputAudioTrack;
+  /** All items of its box, to know when the next one replaces it. */
+  cellItems: CellMedia[];
+}
+
+/** The mixed soundtrack is stereo at 48 kHz, whatever the clips use. */
+const MIX_SAMPLE_RATE = 48000;
+const MIX_CHANNELS = 2;
+/** Mixed audio is handed to the encoder in 1-second pieces. */
+const MIX_CHUNK = MIX_SAMPLE_RATE;
+
+/**
+ * When a clip's sound plays on the timeline and which part of the file it uses:
+ * from when it starts playing (after any delay) until its trimmed end, until the next
+ * item replaces it in its box, or until the timeline ends.
+ */
+function clipSegment(clip: AudioClip, duration: number) {
+  const { item, cellItems } = clip;
+  const playStart = getPlayStart(item);
+  const next = cellItems[cellItems.indexOf(item) + 1];
+  const end = Math.min(duration, playStart + getPlayLength(item), next?.start ?? Infinity);
+  return { playStart, from: item.trimStart, to: item.trimStart + Math.max(0, end - playStart) };
+}
+
+/**
+ * Decodes the part of a track between `from` and `to` (seconds into the file) into one
+ * buffer. Decoded packets don't line up with the trim points, so the first one is cut
+ * to the exact sample.
+ */
+async function readAudioRange(
   track: InputAudioTrack,
-  item: CellMedia,
-  cellItems: CellMedia[],
+  from: number,
+  to: number,
+  signal: AbortSignal,
+): Promise<AudioBuffer | null> {
+  const { sampleRate, numberOfChannels } = track;
+  const total = Math.round((to - from) * sampleRate);
+  if (total <= 0) return null;
+
+  const out = new AudioBuffer({ length: total, numberOfChannels, sampleRate });
+  let written = 0;
+  for await (const { buffer, timestamp } of new AudioBufferSink(track).buffers(from, to)) {
+    throwIfAborted(signal);
+    if (written >= total) break;
+    const skip = Math.max(0, Math.round((from - timestamp) * sampleRate));
+    const take = Math.min(buffer.length - skip, total - written);
+    if (take <= 0) continue;
+    for (let ch = 0; ch < numberOfChannels; ch++) {
+      const source = buffer.getChannelData(Math.min(ch, buffer.numberOfChannels - 1));
+      out.getChannelData(ch).set(source.subarray(skip, skip + take), written);
+    }
+    written += take;
+  }
+  return written > 0 ? out : null;
+}
+
+/**
+ * Mixes every clip's sound into one soundtrack for the whole video and writes it.
+ * The browser's offline audio engine places each clip at its start time and converts
+ * sample rates and mono/stereo as needed.
+ */
+async function writeMixedAudio(
+  source: AudioBufferSource,
+  clips: AudioClip[],
   duration: number,
   signal: AbortSignal,
 ): Promise<void> {
-  const { sampleRate, numberOfChannels } = track;
+  const length = Math.max(1, Math.ceil(duration * MIX_SAMPLE_RATE));
+  const mixer = new OfflineAudioContext(MIX_CHANNELS, length, MIX_SAMPLE_RATE);
 
-  // Silence until the video appears.
-  const leadIn = Math.round(item.start * sampleRate);
-  if (leadIn > 0) {
-    await source.add(new AudioBuffer({ length: leadIn, numberOfChannels, sampleRate }));
+  for (const clip of clips) {
+    const { playStart, from, to } = clipSegment(clip, duration);
+    const buffer = await readAudioRange(clip.track, from, to, signal);
+    if (!buffer) continue;
+    const node = mixer.createBufferSource();
+    node.buffer = buffer;
+    node.connect(mixer.destination);
+    node.start(playStart);
   }
+  throwIfAborted(signal);
 
-  // Sound plays until the (trimmed) video ends, is replaced in its cell, or the timeline ends.
-  const next = cellItems[cellItems.indexOf(item) + 1];
-  const end = Math.min(duration, item.start + getPlayLength(item), next?.start ?? Infinity);
-  const from = item.trimStart;
-  const to = from + (end - item.start);
+  const mixed = await mixer.startRendering();
+  preventClipping(mixed);
 
-  // Decoded buffers don't line up with the trim points, so cut them to the exact sample.
-  let remaining = Math.round((to - from) * sampleRate);
-  for await (const { buffer, timestamp } of new AudioBufferSink(track).buffers(from, to)) {
+  for (let offset = 0; offset < mixed.length; offset += MIX_CHUNK) {
     throwIfAborted(signal);
-    if (remaining <= 0) break;
-    const skip = Math.max(0, Math.round((from - timestamp) * sampleRate));
-    const take = Math.min(buffer.length - skip, remaining);
-    if (take <= 0) continue;
-    await source.add(
-      skip === 0 && take === buffer.length ? buffer : sliceAudioBuffer(buffer, skip, take),
-    );
-    remaining -= take;
+    await source.add(sliceAudioBuffer(mixed, offset, Math.min(MIX_CHUNK, mixed.length - offset)));
+  }
+}
+
+/** Two loud clips at once can add up past full volume; scale down so nothing distorts. */
+function preventClipping(buffer: AudioBuffer): void {
+  let peak = 0;
+  for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+    for (const sample of buffer.getChannelData(ch)) peak = Math.max(peak, Math.abs(sample));
+  }
+  if (peak <= 1) return;
+  const gain = 0.98 / peak;
+  for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+    const data = buffer.getChannelData(ch);
+    for (let i = 0; i < data.length; i++) data[i]! *= gain;
   }
 }
 

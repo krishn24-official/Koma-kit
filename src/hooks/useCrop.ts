@@ -14,6 +14,7 @@ export function useCrop() {
     usePlaybackStore.getState().pause();
     useEditorStore.getState().clearSelection();
     useUiStore.getState().setStickerCrop(null); // only one crop at a time
+    useUiStore.getState().setMediaCrop(null);
     setCropRect(FULL);
   }, [setCropRect]);
 

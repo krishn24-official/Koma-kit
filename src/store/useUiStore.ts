@@ -1,6 +1,13 @@
 import { create } from 'zustand';
 import type { CellRect } from '@/types';
 
+export interface MediaCrop {
+  index: number;
+  itemId: string;
+  rect: CellRect;
+  bars: CellRect | null;
+}
+
 export type PanelId = 'layout' | 'canvas' | 'style' | 'elements';
 export type ToastTone = 'info' | 'success' | 'error';
 
@@ -29,11 +36,17 @@ interface UiStore {
   cropRect: CellRect | null;
   /** Logo/picture being cropped and its crop frame (fractions of the picture). */
   stickerCrop: { id: string; rect: CellRect } | null;
+  /**
+   * Picture/clip in a box being cropped: its crop frame (fractions of the media) and
+   * the detected picture area inside black bars, once known.
+   */
+  mediaCrop: MediaCrop | null;
 
   setActivePanel: (id: PanelId) => void;
   setDownloadDialogOpen: (open: boolean) => void;
   setCropRect: (rect: CellRect | null) => void;
   setStickerCrop: (crop: { id: string; rect: CellRect } | null) => void;
+  setMediaCrop: (crop: MediaCrop | null) => void;
   setVideoExport: (state: VideoExportProgress | null) => void;
   toggleMobilePanel: (id: PanelId) => void;
   closeMobilePanel: () => void;
@@ -51,11 +64,13 @@ export const useUiStore = create<UiStore>()((set) => ({
   downloadDialogOpen: false,
   cropRect: null,
   stickerCrop: null,
+  mediaCrop: null,
 
   setActivePanel: (activePanel) => set({ activePanel }),
   setDownloadDialogOpen: (downloadDialogOpen) => set({ downloadDialogOpen }),
   setCropRect: (cropRect) => set({ cropRect }),
   setStickerCrop: (stickerCrop) => set({ stickerCrop }),
+  setMediaCrop: (mediaCrop) => set({ mediaCrop }),
   setVideoExport: (videoExport) => set({ videoExport }),
 
   toggleMobilePanel: (id) =>

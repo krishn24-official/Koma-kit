@@ -20,7 +20,9 @@ export function findBestCanvasRatio(
 ): number | null {
   const targets = cells.flatMap((_, i) => {
     const size = media[i];
-    return size && size.width > 0 && size.height > 0 ? [{ i, aspect: size.width / size.height }] : [];
+    return size && size.width > 0 && size.height > 0
+      ? [{ i, aspect: size.width / size.height }]
+      : [];
   });
   if (targets.length === 0) return null;
 

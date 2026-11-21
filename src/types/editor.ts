@@ -52,6 +52,15 @@ export interface CellMedia {
   naturalHeight: number;
   /** Full length of the source file in seconds (0 for images). */
   duration: number;
+  /**
+   * Seconds a video waits on its first frame after appearing, before it plays
+   * (e.g. to play after another clip ends). Videos only (0 for images).
+   */
+  delay: number;
+  /** True to leave this video's sound out of the preview and the export. */
+  muted: boolean;
+  /** Part of the picture/frame used, as fractions of it (x, y, w, h). Full = 0, 0, 1, 1. */
+  crop: CellRect;
   /** Part of the source that plays, in seconds into the file. Videos only (0 for images). */
   trimStart: number;
   trimEnd: number;
