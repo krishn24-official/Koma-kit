@@ -1,6 +1,7 @@
 import { useCallback, useEffect } from 'react';
 import { useEditorStore } from '@/store/useEditorStore';
 import { usePlaybackStore } from '@/store/usePlaybackStore';
+import { useMosaicStore } from '@/store/useMosaicStore';
 import { useSheetStore } from '@/store/useSheetStore';
 import { useUiStore } from '@/store/useUiStore';
 import { isMediaFile } from '@/utils/media';
@@ -64,6 +65,13 @@ export function usePaste() {
   const place = useCallback(
     async (files: File[], target?: PasteTarget) => {
       if (files.length === 0) return;
+      const mosaic = useMosaicStore.getState();
+      if (mosaic.active) {
+        // The first paste is the main picture; after that, pictures become tiles.
+        if (!mosaic.target) await mosaic.setTarget(files[0]!);
+        else await mosaic.addTiles(files);
+        return;
+      }
       if (useSheetStore.getState().active) {
         await useSheetStore.getState().addImages(files);
         return;

@@ -1,3 +1,4 @@
+import { MosaicEntrySection } from '@/components/mosaic/MosaicPanels';
 import { SheetEntrySection } from '@/components/sheet/SheetChrome';
 import { MyTemplatesSection } from './MyTemplatesSection';
 import { TemplatesSection } from './TemplatesSection';
@@ -9,6 +10,7 @@ export function TemplatesPanel() {
       <MyTemplatesSection />
       <TemplatesSection />
       <SheetEntrySection />
+      <MosaicEntrySection />
     </div>
   );
 }

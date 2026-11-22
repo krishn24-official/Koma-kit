@@ -5,6 +5,8 @@ import { Workspace } from '@/components/editor/Workspace';
 import { Header } from '@/components/layout/Header';
 import { MobilePanel } from '@/components/layout/MobilePanel';
 import { Sidebar } from '@/components/layout/Sidebar';
+import { MosaicMobilePanel, MosaicSidebar } from '@/components/mosaic/MosaicPanels';
+import { MosaicWorkspace } from '@/components/mosaic/MosaicWorkspace';
 import { EditingCardBar, SheetMobilePanel, SheetSidebar } from '@/components/sheet/SheetChrome';
 import { SheetToolbar } from '@/components/sheet/SheetToolbar';
 import { SheetWorkspace } from '@/components/sheet/SheetWorkspace';
@@ -15,6 +17,7 @@ import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { usePasteShortcut } from '@/hooks/usePaste';
 import { usePlaybackLoop } from '@/hooks/usePlaybackLoop';
 import { useVideoFormatDefault } from '@/hooks/useVideoFormatDefault';
+import { useMosaicStore } from '@/store/useMosaicStore';
 import { useSheetStore } from '@/store/useSheetStore';
 
 export default function App() {
@@ -23,12 +26,21 @@ export default function App() {
   usePasteShortcut();
   useVideoFormatDefault();
   const sheetOpen = useSheetStore((s) => s.active);
+  const mosaicOpen = useMosaicStore((s) => s.active);
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
       <Header />
       <div className="flex min-h-0 flex-1">
-        {sheetOpen ? (
+        {mosaicOpen ? (
+          <>
+            <MosaicSidebar />
+            <main className="flex min-w-0 flex-1 flex-col">
+              <MosaicWorkspace />
+              <MosaicMobilePanel />
+            </main>
+          </>
+        ) : sheetOpen ? (
           <>
             <SheetSidebar />
             <main className="flex min-w-0 flex-1 flex-col">

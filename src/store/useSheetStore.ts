@@ -37,7 +37,8 @@ interface SheetStore {
   /** Cards still being added (rendering). */
   pending: number;
 
-  open: () => Promise<void>;
+  /** Opens the sheet. `addCurrent: false` skips adding the open design as card 1. */
+  open: (options?: { addCurrent?: boolean }) => Promise<void>;
   close: () => void;
   addDesign: (design: TemplateDesign) => Promise<void>;
   addImages: (files: File[]) => Promise<void>;
@@ -104,7 +105,7 @@ export const useSheetStore = create<SheetStore>()((set, get) => {
     stash: null,
     pending: 0,
 
-    open: async () => {
+    open: async ({ addCurrent = true } = {}) => {
       if (!get().loaded) {
         try {
           const saved = await runDb<{ cards: SheetCard[]; settings: SheetSettings } | undefined>(
@@ -132,7 +133,9 @@ export const useSheetStore = create<SheetStore>()((set, get) => {
       useUiStore.getState().closeMobilePanel();
       set({ active: true, stash, selectedId: null });
       // A fresh sheet starts with the design that's open, if there is one.
-      if (get().cards.length === 0 && editorHasWork()) await get().addDesign(stash);
+      if (addCurrent && get().cards.length === 0 && editorHasWork()) {
+        await get().addDesign(stash);
+      }
     },
 
     close: () => {
