@@ -2,6 +2,7 @@ import { ArrowLeftRight } from 'lucide-react';
 import { useRef, useState, type DragEvent } from 'react';
 import { HiddenFileInput } from '@/components/ui/HiddenFileInput';
 import { useMediaUpload } from '@/hooks/useMediaUpload';
+import { canReadClipboard, usePaste } from '@/hooks/usePaste';
 import { useActiveItem } from '@/store/selectors';
 import { useEditorStore } from '@/store/useEditorStore';
 import { useUiStore } from '@/store/useUiStore';
@@ -36,6 +37,7 @@ export function GridCell({ index, rect, radius, unit }: GridCellProps) {
   const select = useEditorStore((s) => s.select);
   const swapCells = useEditorStore((s) => s.swapCells);
   const { uploadToCell } = useMediaUpload();
+  const { pasteFromClipboard } = usePaste();
 
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -112,6 +114,11 @@ export function GridCell({ index, rect, radius, unit }: GridCellProps) {
               // Cells with something scheduled later just get selected (pointer down).
               if (!isSwapTarget && !upcoming) inputRef.current?.click();
             }}
+            onPaste={
+              canReadClipboard() && !upcoming
+                ? () => void pasteFromClipboard({ kind: 'cell', index })
+                : undefined
+            }
           />
         )}
 

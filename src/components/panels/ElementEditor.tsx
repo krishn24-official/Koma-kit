@@ -9,6 +9,8 @@ import {
   Crop,
   FlipHorizontal2,
   ImagePlus,
+  ZoomIn,
+  ZoomOut,
   Trash2,
 } from 'lucide-react';
 import { useRef } from 'react';
@@ -27,6 +29,8 @@ import { useStickerUpload } from '@/hooks/useStickerUpload';
 import { useEditorStore } from '@/store/useEditorStore';
 import type { BadgeElement, CanvasElement, StickerElement, TextAlign, TextElement } from '@/types';
 import { badgeHeight, maxBadgeTextSize, resizeBadge, setBadgeTextSize } from '@/utils/elements';
+import { cn } from '@/utils/cn';
+import { SHAPES, setStickerShape, shapeClipPath, zoomSticker } from '@/utils/stickerShape';
 import { EffectsSections } from './EffectsSections';
 import { FontPicker } from './FontPicker';
 
@@ -134,13 +138,21 @@ function StickerFields({
             {sticker.src ? 'Replace' : `Choose ${sticker.label.toLowerCase()}`}
           </Button>
           {sticker.src && (
-            <Button
-              className="col-span-2"
-              icon={<FlipHorizontal2 />}
-              onClick={() => update({ flipX: !sticker.flipX })}
-            >
-              Flip
-            </Button>
+            <>
+              <Button icon={<ZoomOut />} onClick={() => update(zoomSticker(sticker, 1 / 1.15))}>
+                Zoom out
+              </Button>
+              <Button icon={<ZoomIn />} onClick={() => update(zoomSticker(sticker, 1.15))}>
+                Zoom in
+              </Button>
+              <Button
+                className="col-span-2"
+                icon={<FlipHorizontal2 />}
+                onClick={() => update({ flipX: !sticker.flipX })}
+              >
+                Flip
+              </Button>
+            </>
           )}
         </div>
         <HiddenFileInput
@@ -149,6 +161,33 @@ function StickerFields({
           onFiles={(files) => uploadSticker(sticker.id, files)}
         />
       </PanelSection>
+      {sticker.src && (
+        <PanelSection title="Shape">
+          <div className="grid grid-cols-3 gap-2">
+            {SHAPES.map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={sticker.shape === id}
+                onClick={() => update(setStickerShape(sticker, id))}
+                className={cn(
+                  'flex flex-col items-center gap-1.5 rounded-lg border py-2 text-xs transition-colors',
+                  sticker.shape === id
+                    ? 'border-brand-500 bg-brand-500/10 text-white'
+                    : 'border-neutral-800 text-neutral-300 hover:border-neutral-600',
+                )}
+              >
+                <span
+                  className={cn('h-7 bg-neutral-300', id === 'none' ? 'w-10' : 'w-7')}
+                  style={{ clipPath: shapeClipPath(id, 28, 28) }}
+                  aria-hidden
+                />
+                {label}
+              </button>
+            ))}
+          </div>
+        </PanelSection>
+      )}
       {sticker.src && <EffectsSections effects={sticker} update={update} />}
     </>
   );

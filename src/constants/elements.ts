@@ -76,6 +76,7 @@ export const createSticker = (patch: Partial<StickerElement> = {}): StickerEleme
   label: 'Logo',
   slotAspect: PLACEHOLDER_ASPECT,
   flipX: false,
+  shape: 'none',
   fade: { ...NO_FADE },
   glow: { ...DEFAULT_GLOW },
   shadow: { ...DEFAULT_SHADOW },

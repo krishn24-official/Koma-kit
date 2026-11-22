@@ -3,6 +3,7 @@ import {
   EyeOff,
   ImagePlus,
   Images,
+  Triangle,
   Lock,
   LockOpen,
   RectangleHorizontal,
@@ -15,11 +16,14 @@ import { HiddenFileInput } from '@/components/ui/HiddenFileInput';
 import { PanelSection } from '@/components/ui/PanelSection';
 import { createBadge, createText } from '@/constants/elements';
 import { IconButton } from '@/components/ui/IconButton';
+import { NumberStepper } from '@/components/ui/NumberStepper';
+import { toDesignSize } from '@/constants/canvasSizes';
 import { useAddPictures, useStickerUpload } from '@/hooks/useStickerUpload';
 import { useSelectedElement } from '@/store/selectors';
 import { useEditorStore } from '@/store/useEditorStore';
 import type { CanvasElement, ElementType } from '@/types';
 import { cn } from '@/utils/cn';
+import { isCharacter, MAX_CHARACTERS, setCharacterCount } from '@/utils/characterSlots';
 import { describeElement } from '@/utils/elements';
 import { ElementEditor } from './ElementEditor';
 
@@ -36,6 +40,22 @@ export function ElementsPanel() {
   const updateElement = useEditorStore((s) => s.updateElement);
   const addPictures = useAddPictures();
   const picturesRef = useRef<HTMLInputElement>(null);
+  const characterCount = useEditorStore((s) => s.elements.filter(isCharacter).length);
+
+  /** Adds/removes character boxes to reach `count` and arranges them in a pyramid. */
+  const applyCharacterCount = (count: number) => {
+    const s = useEditorStore.getState();
+    const result = setCharacterCount(s.elements, count, toDesignSize(s.canvasSize));
+    if (
+      result.removedFilled > 0 &&
+      !window.confirm(
+        `This removes ${result.removedFilled} character ${result.removedFilled === 1 ? 'picture' : 'pictures'}. Continue?`,
+      )
+    ) {
+      return;
+    }
+    s.replaceElements(result.elements);
+  };
   const select = useEditorStore((s) => s.select);
   const selected = useSelectedElement();
   const uploadSticker = useStickerUpload();
@@ -74,6 +94,26 @@ export function ElementsPanel() {
           onFiles={(files) => uploadSticker(null, files)}
         />
         <HiddenFileInput ref={picturesRef} accept="image/*" multiple onFiles={addPictures} />
+        <div className="mt-4 space-y-2">
+          <NumberStepper
+            label="Character boxes"
+            value={characterCount}
+            min={0}
+            max={MAX_CHARACTERS}
+            onChange={applyCharacterCount}
+          />
+          {characterCount > 1 && (
+            <Button
+              size="sm"
+              variant="ghost"
+              fullWidth
+              icon={<Triangle />}
+              onClick={() => applyCharacterCount(characterCount)}
+            >
+              Arrange in pyramid
+            </Button>
+          )}
+        </div>
       </PanelSection>
 
       {elements.length > 0 && (

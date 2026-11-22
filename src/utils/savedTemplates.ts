@@ -9,6 +9,7 @@
 import { DESIGN_WIDTH } from '@/constants/canvasSizes';
 import type { EditorState, TemplateDesign } from '@/store/useEditorStore';
 import type { CanvasElement, CellMedia, CanvasStyle } from '@/types';
+import { requestPersistence, runDb } from './db';
 import { canvasToBlob } from './download';
 import { createId } from './id';
 import { resolveLayout } from './layoutTree';
@@ -103,54 +104,25 @@ export async function renderThumbnail(s: EditorState, withMedia: boolean): Promi
   return canvasToBlob(canvas, 'image/jpeg', 0.8);
 }
 
-// ─── IndexedDB ───────────────────────────────────────────────────────────────
-
-const DB_NAME = 'koma-kit';
-const STORE = 'templates';
-
-let dbPromise: Promise<IDBDatabase> | null = null;
-
-function openDb(): Promise<IDBDatabase> {
-  dbPromise ??= new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 1);
-    request.onupgradeneeded = () => request.result.createObjectStore(STORE, { keyPath: 'id' });
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => {
-      dbPromise = null;
-      reject(request.error ?? new Error('Could not open storage'));
-    };
-  });
-  return dbPromise;
-}
-
-async function run<T>(
-  mode: IDBTransactionMode,
-  action: (store: IDBObjectStore) => IDBRequest<T>,
-): Promise<T> {
-  const db = await openDb();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, mode);
-    const request = action(tx.objectStore(STORE));
-    tx.oncomplete = () => resolve(request.result);
-    tx.onerror = () => reject(tx.error ?? request.error ?? new Error('Storage error'));
-    tx.onabort = () => reject(tx.error ?? new Error('Storage error'));
-  });
-}
+// ─── Storage ─────────────────────────────────────────────────────────────────
 
 /** Newest first. */
 export async function listTemplates(): Promise<SavedTemplate[]> {
-  const all = await run('readonly', (store) => store.getAll() as IDBRequest<SavedTemplate[]>);
+  const all = await runDb(
+    'templates',
+    'readonly',
+    (store) => store.getAll() as IDBRequest<SavedTemplate[]>,
+  );
   return all.sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
 export async function putTemplate(template: SavedTemplate): Promise<void> {
-  await run('readwrite', (store) => store.put(template));
-  // Ask the browser not to clear saved templates when the phone runs low on space.
-  void navigator.storage?.persist?.().catch(() => undefined);
+  await runDb('templates', 'readwrite', (store) => store.put(template));
+  requestPersistence();
 }
 
 export async function deleteTemplate(id: string): Promise<void> {
-  await run('readwrite', (store) => store.delete(id));
+  await runDb('templates', 'readwrite', (store) => store.delete(id));
 }
 
 // ─── .komakit file ───────────────────────────────────────────────────────────

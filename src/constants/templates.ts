@@ -4,6 +4,7 @@ import { DEFAULT_CANVAS_SIZE } from './canvasSizes';
 import { DEFAULT_STYLE } from './editor';
 import { createBadge, createSticker, createText } from './elements';
 import { getPreset } from './layouts';
+import { newCharacterSlot } from '@/utils/characterSlots';
 
 export interface StarterTemplate {
   id: string;
@@ -76,16 +77,7 @@ const newsBanner = (): TemplateDesign => ({
  * on the ones behind it.
  */
 const collagePoster = (): TemplateDesign => {
-  const character = (x: number, y: number, width: number) =>
-    createSticker({
-      label: 'Character',
-      slotAspect: 0.7,
-      x,
-      y,
-      width,
-      fade: { top: 0, bottom: 0.3, left: 0, right: 0 },
-      shadow: { strength: 0.7, blur: 40, distance: 10 },
-    });
+  const character = (x: number, y: number, width: number) => newCharacterSlot({ x, y, width });
   return {
     canvasSize: DEFAULT_CANVAS_SIZE,
     layoutRoot: getPreset('single').root,

@@ -1,4 +1,5 @@
 import {
+  ClipboardPaste,
   ArrowLeftRight,
   CalendarClock,
   Check,
@@ -22,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useRef, type ReactNode } from 'react';
 import { Button } from '@/components/ui/Button';
+import { AddLogoButton } from './AddLogoButton';
 import { HiddenFileInput } from '@/components/ui/HiddenFileInput';
 import { IconButton } from '@/components/ui/IconButton';
 import { Slider } from '@/components/ui/Slider';
@@ -31,6 +33,7 @@ import { useFitToPictures } from '@/hooks/useFitToPictures';
 import { useMediaCrop } from '@/hooks/useMediaCrop';
 import { useStickerCrop } from '@/hooks/useStickerCrop';
 import { useMediaUpload } from '@/hooks/useMediaUpload';
+import { canReadClipboard, usePaste, type PasteTarget } from '@/hooks/usePaste';
 import {
   useActiveItem,
   useCurrentLayout,
@@ -41,6 +44,38 @@ import { useEditorStore } from '@/store/useEditorStore';
 import { usePlaybackStore } from '@/store/usePlaybackStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { CellMedia, ImageTransform, PixelRect } from '@/types';
+
+/** Pastes a copied picture (shown only where the browser can read the clipboard). */
+function PasteButton({
+  target,
+  label,
+  withText = false,
+}: {
+  target: PasteTarget;
+  label: string;
+  withText?: boolean;
+}) {
+  const { pasteFromClipboard } = usePaste();
+  if (!canReadClipboard()) return null;
+  return withText ? (
+    <Button size="sm" icon={<ClipboardPaste />} onClick={() => void pasteFromClipboard(target)}>
+      {label}
+    </Button>
+  ) : (
+    <IconButton
+      label={label}
+      icon={<ClipboardPaste />}
+      onClick={() => void pasteFromClipboard(target)}
+    />
+  );
+}
+
+/** Zooms a logo/picture inside its frame (see zoomSticker). */
+function zoomSelectedSticker(id: string, factor: number) {
+  const store = useEditorStore.getState();
+  const el = store.elements.find((e) => e.id === id);
+  if (el?.type === 'sticker' && el.src) store.updateElement(id, zoomSticker(el, factor));
+}
 import {
   clampTransform,
   getFitTransform,
@@ -49,6 +84,7 @@ import {
 } from '@/utils/imageTransform';
 import { hasBars } from '@/utils/detectBars';
 import { clamp } from '@/utils/math';
+import { zoomSticker } from '@/utils/stickerShape';
 import { formatTime, getPlayLength, getPlayStart, isVideoRunning } from '@/utils/timeline';
 
 const ZOOM_STEP = 1.1;
@@ -139,6 +175,7 @@ function MediaControls({ index, item, cellRect }: MediaControlsProps) {
           icon={<RefreshCw />}
           onClick={() => inputRef.current?.click()}
         />
+        <PasteButton target={{ kind: 'cell', index }} label="Paste to replace" />
         <IconButton
           label="Swap with another cell"
           icon={<ArrowLeftRight />}
@@ -178,6 +215,7 @@ function EmptyCellControls({ index }: { index: number }) {
       >
         Add media
       </Button>
+      {!hasScheduled && <PasteButton target={{ kind: 'cell', index }} label="Paste" withText />}
       <HiddenFileInput ref={inputRef} onFiles={handleFiles} />
     </div>
   );
@@ -383,6 +421,12 @@ export function CellToolbar() {
     const el = s.elements.find((e) => e.id === sel.id);
     return el?.type === 'sticker' && Boolean(el.src);
   });
+  const selectedIsSticker = useEditorStore((s) => {
+    const sel = s.selection;
+    return (
+      sel?.kind === 'element' && s.elements.some((e) => e.id === sel.id && e.type === 'sticker')
+    );
+  });
 
   let content: ReactNode;
 
@@ -457,10 +501,25 @@ export function CellToolbar() {
     content = (
       <div className="flex items-center gap-3">
         <Hint>Drag to move. Drag a corner dot or pinch to resize.</Hint>
+        {selectedIsSticker && (
+          <PasteButton target={{ kind: 'sticker', id: selection.id }} label="Paste picture" />
+        )}
         {selectedIsPicture && (
-          <Button size="sm" icon={<CropIcon />} onClick={() => stickerCrop.start(selection.id)}>
-            Crop
-          </Button>
+          <>
+            <IconButton
+              label="Zoom out"
+              icon={<ZoomOut />}
+              onClick={() => zoomSelectedSticker(selection.id, 1 / 1.15)}
+            />
+            <IconButton
+              label="Zoom in"
+              icon={<ZoomIn />}
+              onClick={() => zoomSelectedSticker(selection.id, 1.15)}
+            />
+            <Button size="sm" icon={<CropIcon />} onClick={() => stickerCrop.start(selection.id)}>
+              Crop
+            </Button>
+          </>
         )}
         <IconButton
           label="Delete"
@@ -478,6 +537,7 @@ export function CellToolbar() {
           <Button size="sm" icon={<Plus />} onClick={addLayer}>
             Add layer
           </Button>
+          <AddLogoButton />
           <Button size="sm" icon={<CropIcon />} onClick={crop.start}>
             Crop
           </Button>

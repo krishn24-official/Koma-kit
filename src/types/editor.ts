@@ -160,6 +160,8 @@ export interface StickerElement extends ElementBase {
   slotAspect: number;
   /** Mirrored left ↔ right. */
   flipX: boolean;
+  /** Outline the picture is cut to (logos); 'none' shows the whole crop. */
+  shape: StickerShape;
   /** How far each edge fades out to transparent, as a share of the picture (0 = none). */
   fade: StickerFade;
   /** Soft colored light around the picture's outline. */
@@ -177,6 +179,8 @@ export interface PictureEffects {
   shadow: StickerShadow;
   adjust: StickerAdjust;
 }
+
+export type StickerShape = 'none' | 'square' | 'rounded' | 'circle' | 'hexagon' | 'diamond';
 
 export interface StickerFade {
   top: number;

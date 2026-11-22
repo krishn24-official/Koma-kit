@@ -10,6 +10,7 @@ import { cn } from '@/utils/cn';
 import { anchorFraction, scaleElement, stickerHeight } from '@/utils/elements';
 import { clamp } from '@/utils/math';
 import { adjustFilter, fadeMaskStyle, outlineFilter } from '@/utils/pictureEffects';
+import { shapeClipPath } from '@/utils/stickerShape';
 import { getBadgeRenderStyle, getTextRenderStyle } from '@/utils/textStyle';
 import { CropFrame } from './CropFrame';
 
@@ -69,6 +70,7 @@ function StickerContent({
               width,
               height,
               transform: sticker.flipX && !plain ? 'scaleX(-1)' : undefined,
+              clipPath: plain ? undefined : shapeClipPath(sticker.shape, width, height),
             }}
           >
             <img

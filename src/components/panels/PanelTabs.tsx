@@ -13,7 +13,7 @@ export function PanelTabs({ activeId, onSelect, variant }: PanelTabsProps) {
     <nav
       aria-label="Editor panels"
       className={cn(
-        'grid shrink-0 grid-cols-4',
+        'grid shrink-0 grid-cols-5',
         variant === 'sidebar'
           ? 'gap-1 border-b border-neutral-800 p-2'
           : 'border-t border-neutral-800 bg-neutral-950 px-1 pb-[env(safe-area-inset-bottom)]',

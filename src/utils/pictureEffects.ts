@@ -12,6 +12,7 @@ import type { CSSProperties } from 'react';
 import type { PictureEffects, StickerAdjust, StickerElement, StickerFade } from '@/types';
 import { hexToRgba } from './background';
 import { stickerHeight } from './elements';
+import { clipToShape } from './stickerShape';
 
 const SIDES = ['top', 'bottom', 'left', 'right'] as const;
 /** CSS gradient direction that starts at each side. */
@@ -206,6 +207,7 @@ export function renderStickerLayer(
 
   const base = makeCanvas(w, h);
   base.ctx.imageSmoothingQuality = 'high';
+  clipToShape(base.ctx, sticker.shape, w, h);
   if (sticker.flipX) {
     base.ctx.translate(w, 0);
     base.ctx.scale(-1, 1);

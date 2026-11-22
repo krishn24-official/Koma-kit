@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { isQuotaError } from '@/utils/db';
 import { downloadBlob, sanitizeFileName } from '@/utils/download';
 import { createId } from '@/utils/id';
 import {
@@ -40,9 +41,6 @@ interface TemplatesStore {
 }
 
 const toastError = (message: string) => useUiStore.getState().showToast(message, 'error');
-
-const isQuotaError = (e: unknown) =>
-  e instanceof DOMException && (e.name === 'QuotaExceededError' || e.code === 22);
 
 export const useTemplatesStore = create<TemplatesStore>()((set, get) => ({
   templates: [],

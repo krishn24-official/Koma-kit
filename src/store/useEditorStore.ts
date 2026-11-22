@@ -128,6 +128,8 @@ export interface EditorActions {
   moveElement: (id: string, step: 1 | -1) => void;
   /** Brings an element in front of all others, or sends it behind all others. */
   moveElementToEnd: (id: string, end: 'front' | 'back') => void;
+  /** Replaces all elements (frees pictures of removed ones). */
+  replaceElements: (elements: CanvasElement[]) => void;
   /** Adds several elements at once and selects the last one. */
   addElements: (elements: CanvasElement[]) => void;
   setBoxFade: (index: number, fade: BoxFade | null) => void;
@@ -579,6 +581,17 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
       if (!el) return {};
       const rest = s.elements.filter((e) => e.id !== id);
       return { elements: end === 'front' ? [...rest, el] : [el, ...rest] };
+    }),
+
+  replaceElements: (elements) =>
+    set((s) => {
+      const kept = new Set(elements.map((el) => el.id));
+      s.elements.forEach((el) => {
+        if (!kept.has(el.id) && el.type === 'sticker' && el.src) URL.revokeObjectURL(el.src);
+      });
+      const selection =
+        s.selection?.kind === 'element' && !kept.has(s.selection.id) ? null : s.selection;
+      return { elements, selection };
     }),
 
   addElements: (added) =>
