@@ -1,6 +1,7 @@
 import { Columns3, Equal, Plus, Rows3, SquareMinus } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { PanelSection } from '@/components/ui/PanelSection';
+import { AddLogoButton } from '@/components/editor/AddLogoButton';
 import { MAX_CELLS } from '@/constants/layouts';
 import { useCurrentLayout } from '@/store/selectors';
 import { useEditorStore } from '@/store/useEditorStore';
@@ -28,9 +29,12 @@ export function LayersSection() {
       }
     >
       <div className="space-y-2">
-        <Button variant="primary" fullWidth icon={<Plus />} disabled={full} onClick={addLayer}>
-          {full ? `Max ${MAX_CELLS} boxes` : 'Add layer'}
-        </Button>
+        <div className="grid grid-cols-2 gap-2">
+          <Button variant="primary" icon={<Plus />} disabled={full} onClick={addLayer}>
+            {full ? `Max ${MAX_CELLS} boxes` : 'Add layer'}
+          </Button>
+          <AddLogoButton size="md" />
+        </div>
         <div className="grid grid-cols-2 gap-2">
           <Button size="sm" icon={<Rows3 />} disabled={full} onClick={addRow}>
             Add row

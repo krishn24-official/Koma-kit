@@ -1,6 +1,10 @@
 import { X } from 'lucide-react';
 import { useEffect } from 'react';
 import { IconButton } from '@/components/ui/IconButton';
+import { SheetDownloadOptions } from '@/components/sheet/SheetDownloadOptions';
+import { MosaicDownloadOptions } from '@/components/mosaic/MosaicDownloadOptions';
+import { useMosaicStore } from '@/store/useMosaicStore';
+import { useSheetStore } from '@/store/useSheetStore';
 import { useUiStore } from '@/store/useUiStore';
 import { DownloadOptions } from './DownloadOptions';
 
@@ -11,6 +15,8 @@ import { DownloadOptions } from './DownloadOptions';
 export function DownloadDialog() {
   const open = useUiStore((s) => s.downloadDialogOpen);
   const setOpen = useUiStore((s) => s.setDownloadDialogOpen);
+  const sheetOpen = useSheetStore((s) => s.active);
+  const mosaicOpen = useMosaicStore((s) => s.active);
 
   useEffect(() => {
     if (!open) return;
@@ -37,12 +43,18 @@ export function DownloadDialog() {
       >
         <div className="flex shrink-0 items-center justify-between border-b border-neutral-800 px-4 py-3">
           <h2 id="download-dialog-title" className="font-semibold">
-            Download
+            {mosaicOpen ? 'Download mosaic' : sheetOpen ? 'Download sheet' : 'Download'}
           </h2>
           <IconButton label="Close" icon={<X />} onClick={close} />
         </div>
         <div className="overflow-y-auto overscroll-contain p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-          <DownloadOptions onDone={close} />
+          {mosaicOpen ? (
+            <MosaicDownloadOptions onDone={close} />
+          ) : sheetOpen ? (
+            <SheetDownloadOptions onDone={close} />
+          ) : (
+            <DownloadOptions onDone={close} />
+          )}
         </div>
       </div>
     </div>

@@ -80,6 +80,7 @@ export function getTemplateSnapshot(): TemplateSnapshot {
     cells: s.cells,
     elements: s.elements,
     boxFades: s.boxFades,
+    boxEffects: s.boxEffects,
   };
 }
 

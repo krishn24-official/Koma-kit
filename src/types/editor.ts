@@ -121,6 +121,10 @@ interface ElementBase {
   rotation: number;
   /** 0–1 */
   opacity: number;
+  /** Hidden elements are left out of the preview and the download. */
+  hidden: boolean;
+  /** Locked elements can't be tapped or dragged on the canvas (select them in the list). */
+  locked: boolean;
 }
 
 export interface TextElement extends ElementBase {
@@ -152,6 +156,60 @@ export interface StickerElement extends ElementBase {
   width: number;
   /** Placeholder label, e.g. "Anime logo". */
   label: string;
+  /** Shape (width / height) of the empty placeholder slot. */
+  slotAspect: number;
+  /** Mirrored left ↔ right. */
+  flipX: boolean;
+  /** Outline the picture is cut to (logos); 'none' shows the whole crop. */
+  shape: StickerShape;
+  /** How far each edge fades out to transparent, as a share of the picture (0 = none). */
+  fade: StickerFade;
+  /** Soft colored light around the picture's outline. */
+  glow: StickerGlow;
+  /** Shadow behind the picture's outline, so overlapping pictures separate. */
+  shadow: StickerShadow;
+  /** Color adjustments; 1 = unchanged. */
+  adjust: StickerAdjust;
+}
+
+/** Blending effects shared by pictures on the canvas and grid boxes. */
+export interface PictureEffects {
+  fade: StickerFade;
+  glow: StickerGlow;
+  shadow: StickerShadow;
+  adjust: StickerAdjust;
+}
+
+export type StickerShape = 'none' | 'square' | 'rounded' | 'circle' | 'hexagon' | 'diamond';
+
+export interface StickerFade {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+}
+
+export interface StickerGlow {
+  color: string;
+  /** 0 = off, up to 1. */
+  strength: number;
+  /** Blur size in design units. */
+  size: number;
+}
+
+export interface StickerShadow {
+  /** 0 = off, up to 1. */
+  strength: number;
+  /** Blur size in design units. */
+  blur: number;
+  /** Offset down/right in design units (follows the picture's rotation). */
+  distance: number;
+}
+
+export interface StickerAdjust {
+  brightness: number;
+  contrast: number;
+  saturation: number;
 }
 
 /** A label in a rounded box, e.g. "NEW INFO". */
@@ -193,10 +251,7 @@ export interface BoxFade {
   reach: number;
 }
 
-export type Selection =
-  | { kind: 'cell'; index: number }
-  | { kind: 'element'; id: string }
-  | null;
+export type Selection = { kind: 'cell'; index: number } | { kind: 'element'; id: string } | null;
 
 export type ExportFormat = 'png' | 'jpeg' | 'mp4';
 

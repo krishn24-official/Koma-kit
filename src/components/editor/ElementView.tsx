@@ -1,4 +1,4 @@
-import { useDrag } from '@use-gesture/react';
+import { useDrag, useGesture } from '@use-gesture/react';
 import { ImagePlus } from 'lucide-react';
 import { useRef, type CSSProperties } from 'react';
 import { HiddenFileInput } from '@/components/ui/HiddenFileInput';
@@ -9,6 +9,8 @@ import type { BadgeElement, CanvasElement, Size, StickerElement, TextElement } f
 import { cn } from '@/utils/cn';
 import { anchorFraction, scaleElement, stickerHeight } from '@/utils/elements';
 import { clamp } from '@/utils/math';
+import { adjustFilter, fadeMaskStyle, outlineFilter } from '@/utils/pictureEffects';
+import { shapeClipPath } from '@/utils/stickerShape';
 import { getBadgeRenderStyle, getTextRenderStyle } from '@/utils/textStyle';
 import { CropFrame } from './CropFrame';
 
@@ -43,26 +45,49 @@ const fullPictureSize = (sticker: StickerElement, unit: number) => {
   return { width, height: (width * sticker.naturalHeight) / sticker.naturalWidth };
 };
 
-function StickerContent({ sticker, unit }: { sticker: StickerElement; unit: number }) {
+function StickerContent({
+  sticker,
+  unit,
+  plain,
+}: {
+  sticker: StickerElement;
+  unit: number;
+  /** Without effects or flip (while cropping, the crop frame shows the plain picture). */
+  plain: boolean;
+}) {
   const width = sticker.width * unit;
   const height = stickerHeight(sticker) * unit;
   if (sticker.src) {
     // Show only the cropped part: the full picture, shifted inside a clipping box.
+    // Layers (outside in): glow/shadow → edge-fade mask → mirror + clip → picture colors.
     const full = fullPictureSize(sticker, unit);
     return (
-      <div className="relative overflow-hidden" style={{ width, height }}>
-        <img
-          src={sticker.src}
-          alt=""
-          draggable={false}
-          className="absolute block max-w-none select-none"
-          style={{
-            width: full.width,
-            height: full.height,
-            left: -sticker.crop.x * full.width,
-            top: -sticker.crop.y * full.height,
-          }}
-        />
+      <div style={{ filter: plain ? undefined : outlineFilter(sticker, unit) }}>
+        <div style={plain ? undefined : fadeMaskStyle(sticker.fade)}>
+          <div
+            className="relative overflow-hidden"
+            style={{
+              width,
+              height,
+              transform: sticker.flipX && !plain ? 'scaleX(-1)' : undefined,
+              clipPath: plain ? undefined : shapeClipPath(sticker.shape, width, height),
+            }}
+          >
+            <img
+              src={sticker.src}
+              alt=""
+              draggable={false}
+              className="absolute block max-w-none select-none"
+              style={{
+                width: full.width,
+                height: full.height,
+                left: -sticker.crop.x * full.width,
+                top: -sticker.crop.y * full.height,
+                filter: plain ? undefined : adjustFilter(sticker.adjust),
+              }}
+            />
+          </div>
+        </div>
       </div>
     );
   }
@@ -142,6 +167,14 @@ function StickerCropper({ sticker, unit }: { sticker: StickerElement; unit: numb
   );
 }
 
+/** Resize dots on every corner; each scales the element around its centre. */
+const RESIZE_CORNERS = [
+  { label: 'top left', className: '-top-5 -left-5 cursor-nwse-resize' },
+  { label: 'top right', className: '-top-5 -right-5 cursor-nesw-resize' },
+  { label: 'bottom left', className: '-bottom-5 -left-5 cursor-nesw-resize' },
+  { label: 'bottom right', className: '-right-5 -bottom-5 cursor-nwse-resize' },
+] as const;
+
 interface ElementViewProps {
   element: CanvasElement;
   /** Preview pixels per design unit. */
@@ -150,7 +183,7 @@ interface ElementViewProps {
 }
 
 /**
- * Any element on the canvas. Tap to select, drag to move, drag the corner dot to
+ * Any element on the canvas. Tap to select, drag to move, drag a corner dot (or pinch) to
  * resize. Tapping an empty logo slot opens the file picker.
  */
 export function ElementView({ element, unit, canvasSize }: ElementViewProps) {
@@ -164,25 +197,42 @@ export function ElementView({ element, unit, canvasSize }: ElementViewProps) {
   const isEmptySlot = element.type === 'sticker' && !element.src;
   const isCropping = useUiStore((s) => s.stickerCrop?.id === id);
 
-  const bindMove = useDrag(
-    ({ delta: [dx, dy], first, tap }) => {
-      const store = useEditorStore.getState();
-      if (first || tap) {
-        store.select({ kind: 'element', id });
-        useUiStore.getState().setActivePanel('elements');
-      }
-      if (tap) {
-        if (isEmptySlot) inputRef.current?.click();
-        return;
-      }
-      const current = store.elements.find((el) => el.id === id);
-      if (!current) return;
-      store.updateElement(id, {
-        x: clamp(current.x + dx / canvasSize.width, 0, 1),
-        y: clamp(current.y + dy / canvasSize.height, 0, 1),
-      });
+  const select = () => {
+    useEditorStore.getState().select({ kind: 'element', id });
+    useUiStore.getState().setActivePanel('elements');
+  };
+
+  // Drag to move; pinch with two fingers to make it bigger or smaller.
+  const bindMove = useGesture(
+    {
+      onDrag: ({ delta: [dx, dy], first, tap, pinching, cancel }) => {
+        if (pinching) return cancel();
+        const store = useEditorStore.getState();
+        if (first || tap) select();
+        if (tap) {
+          if (isEmptySlot) inputRef.current?.click();
+          return;
+        }
+        const current = store.elements.find((el) => el.id === id);
+        if (!current) return;
+        store.updateElement(id, {
+          x: clamp(current.x + dx / canvasSize.width, 0, 1),
+          y: clamp(current.y + dy / canvasSize.height, 0, 1),
+        });
+      },
+      // movement[0] is the scale since the pinch started (1 = unchanged).
+      onPinch: ({ movement: [scale], first, memo }) => {
+        let start = memo as CanvasElement | undefined;
+        if (first || !start) {
+          start = useEditorStore.getState().elements.find((e) => e.id === id);
+          if (!start) return memo;
+          select();
+        }
+        useEditorStore.getState().updateElement(id, scaleElement(start, scale));
+        return start;
+      },
     },
-    { filterTaps: true },
+    { drag: { filterTaps: true }, pinch: { pinchOnWheel: false, rubberband: false } },
   );
 
   // Resizes around the anchor: the size follows the pointer's distance from it.
@@ -206,6 +256,8 @@ export function ElementView({ element, unit, canvasSize }: ElementViewProps) {
     { pointer: { capture: true } },
   );
 
+  if (element.hidden) return null;
+
   const a = anchorFraction(element);
   const style: CSSProperties = {
     left: element.x * canvasSize.width,
@@ -220,28 +272,38 @@ export function ElementView({ element, unit, canvasSize }: ElementViewProps) {
       ref={ref}
       {...bindMove()}
       className={cn(
-        'pointer-events-auto absolute cursor-move touch-none select-none',
+        'absolute touch-none select-none',
+        element.locked && !isCropping ? 'pointer-events-none' : 'pointer-events-auto cursor-move',
         isSelected && !isCropping && 'outline-2 outline-offset-4 outline-brand-500 outline-dashed',
         isCropping && 'z-10',
       )}
       style={style}
     >
       {element.type === 'text' && <TextContent text={element} unit={unit} />}
-      {element.type === 'sticker' && <StickerContent sticker={element} unit={unit} />}
+      {element.type === 'sticker' && (
+        <StickerContent sticker={element} unit={unit} plain={isCropping} />
+      )}
       {element.type === 'badge' && <BadgeContent badge={element} unit={unit} />}
       {isCropping && element.type === 'sticker' && <StickerCropper sticker={element} unit={unit} />}
 
-      {isSelected && !isCropping && (
-        <div
-          {...bindResize()}
-          role="slider"
-          aria-label="Drag to resize"
-          aria-valuenow={0}
-          className="absolute -right-4 -bottom-4 flex size-6 cursor-nwse-resize touch-none items-center justify-center"
-        >
-          <span className="size-3.5 rounded-full border-2 border-brand-500 bg-white shadow" />
-        </div>
-      )}
+      {isSelected &&
+        !isCropping &&
+        !element.locked &&
+        RESIZE_CORNERS.map((corner) => (
+          <div
+            key={corner.label}
+            {...bindResize()}
+            role="slider"
+            aria-label={`Drag to resize (${corner.label})`}
+            aria-valuenow={0}
+            className={cn(
+              'absolute flex size-8 touch-none items-center justify-center',
+              corner.className,
+            )}
+          >
+            <span className="size-3.5 rounded-full border-2 border-brand-500 bg-white shadow" />
+          </div>
+        ))}
 
       {element.type === 'sticker' && (
         <HiddenFileInput

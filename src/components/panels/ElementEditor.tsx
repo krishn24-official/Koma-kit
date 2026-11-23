@@ -3,9 +3,14 @@ import {
   AlignCenterVertical,
   ArrowDown,
   ArrowUp,
+  ChevronsDown,
+  ChevronsUp,
   Copy,
   Crop,
+  FlipHorizontal2,
   ImagePlus,
+  ZoomIn,
+  ZoomOut,
   Trash2,
 } from 'lucide-react';
 import { useRef } from 'react';
@@ -24,6 +29,9 @@ import { useStickerUpload } from '@/hooks/useStickerUpload';
 import { useEditorStore } from '@/store/useEditorStore';
 import type { BadgeElement, CanvasElement, StickerElement, TextAlign, TextElement } from '@/types';
 import { badgeHeight, maxBadgeTextSize, resizeBadge, setBadgeTextSize } from '@/utils/elements';
+import { cn } from '@/utils/cn';
+import { SHAPES, setStickerShape, shapeClipPath, zoomSticker } from '@/utils/stickerShape';
+import { EffectsSections } from './EffectsSections';
 import { FontPicker } from './FontPicker';
 
 type Update<T> = (patch: Partial<T>) => void;
@@ -102,33 +110,86 @@ function TextFields({ text, update }: { text: TextElement; update: Update<TextEl
   );
 }
 
-function StickerFields({ sticker }: { sticker: StickerElement }) {
+function StickerFields({
+  sticker,
+  update,
+}: {
+  sticker: StickerElement;
+  update: Update<StickerElement>;
+}) {
   const uploadSticker = useStickerUpload();
   const { start: startCrop } = useStickerCrop();
   const inputRef = useRef<HTMLInputElement>(null);
   return (
-    <PanelSection title="Picture">
-      <div className={sticker.src ? 'grid grid-cols-2 gap-2' : undefined}>
-        {sticker.src && (
-          <Button variant="primary" icon={<Crop />} onClick={() => startCrop(sticker.id)}>
-            Crop
+    <>
+      <PanelSection title="Picture">
+        <div className={sticker.src ? 'grid grid-cols-2 gap-2' : undefined}>
+          {sticker.src && (
+            <Button variant="primary" icon={<Crop />} onClick={() => startCrop(sticker.id)}>
+              Crop
+            </Button>
+          )}
+          <Button
+            variant={sticker.src ? 'secondary' : 'primary'}
+            fullWidth
+            icon={<ImagePlus />}
+            onClick={() => inputRef.current?.click()}
+          >
+            {sticker.src ? 'Replace' : `Choose ${sticker.label.toLowerCase()}`}
           </Button>
-        )}
-        <Button
-          variant={sticker.src ? 'secondary' : 'primary'}
-          fullWidth
-          icon={<ImagePlus />}
-          onClick={() => inputRef.current?.click()}
-        >
-          {sticker.src ? 'Replace' : `Choose ${sticker.label.toLowerCase()}`}
-        </Button>
-      </div>
-      <HiddenFileInput
-        ref={inputRef}
-        accept="image/*"
-        onFiles={(files) => uploadSticker(sticker.id, files)}
-      />
-    </PanelSection>
+          {sticker.src && (
+            <>
+              <Button icon={<ZoomOut />} onClick={() => update(zoomSticker(sticker, 1 / 1.15))}>
+                Zoom out
+              </Button>
+              <Button icon={<ZoomIn />} onClick={() => update(zoomSticker(sticker, 1.15))}>
+                Zoom in
+              </Button>
+              <Button
+                className="col-span-2"
+                icon={<FlipHorizontal2 />}
+                onClick={() => update({ flipX: !sticker.flipX })}
+              >
+                Flip
+              </Button>
+            </>
+          )}
+        </div>
+        <HiddenFileInput
+          ref={inputRef}
+          accept="image/*"
+          onFiles={(files) => uploadSticker(sticker.id, files)}
+        />
+      </PanelSection>
+      {sticker.src && (
+        <PanelSection title="Shape">
+          <div className="grid grid-cols-3 gap-2">
+            {SHAPES.map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={sticker.shape === id}
+                onClick={() => update(setStickerShape(sticker, id))}
+                className={cn(
+                  'flex flex-col items-center gap-1.5 rounded-lg border py-2 text-xs transition-colors',
+                  sticker.shape === id
+                    ? 'border-brand-500 bg-brand-500/10 text-white'
+                    : 'border-neutral-800 text-neutral-300 hover:border-neutral-600',
+                )}
+              >
+                <span
+                  className={cn('h-7 bg-neutral-300', id === 'none' ? 'w-10' : 'w-7')}
+                  style={{ clipPath: shapeClipPath(id, 28, 28) }}
+                  aria-hidden
+                />
+                {label}
+              </button>
+            ))}
+          </div>
+        </PanelSection>
+      )}
+      {sticker.src && <EffectsSections effects={sticker} update={update} />}
+    </>
   );
 }
 
@@ -271,6 +332,7 @@ export function ElementEditor({ element }: { element: CanvasElement }) {
   const removeElement = useEditorStore((s) => s.removeElement);
   const duplicateElement = useEditorStore((s) => s.duplicateElement);
   const moveElement = useEditorStore((s) => s.moveElement);
+  const moveElementToEnd = useEditorStore((s) => s.moveElementToEnd);
   const update = (patch: Partial<CanvasElement>) => updateElement(element.id, patch);
 
   // Badges have their own Badge size / Text size sliders.
@@ -294,7 +356,7 @@ export function ElementEditor({ element }: { element: CanvasElement }) {
   return (
     <div className="space-y-6">
       {element.type === 'text' && <TextFields text={element} update={update} />}
-      {element.type === 'sticker' && <StickerFields sticker={element} />}
+      {element.type === 'sticker' && <StickerFields sticker={element} update={update} />}
       {element.type === 'badge' && <BadgeFields badge={element} update={update} />}
 
       <PanelSection title={element.type === 'badge' ? 'Position' : 'Size & position'}>
@@ -337,6 +399,20 @@ export function ElementEditor({ element }: { element: CanvasElement }) {
             </Button>
             <Button size="sm" icon={<ArrowDown />} onClick={() => moveElement(element.id, -1)}>
               Backward
+            </Button>
+            <Button
+              size="sm"
+              icon={<ChevronsUp />}
+              onClick={() => moveElementToEnd(element.id, 'front')}
+            >
+              To front
+            </Button>
+            <Button
+              size="sm"
+              icon={<ChevronsDown />}
+              onClick={() => moveElementToEnd(element.id, 'back')}
+            >
+              To back
             </Button>
           </div>
         </div>

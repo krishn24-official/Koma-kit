@@ -15,7 +15,7 @@ import { clamp } from './math';
 export const stickerHeight = (sticker: StickerElement, width = sticker.width): number =>
   sticker.src && sticker.naturalWidth > 0
     ? (width * sticker.naturalHeight * sticker.crop.h) / (sticker.naturalWidth * sticker.crop.w)
-    : width / PLACEHOLDER_ASPECT;
+    : width / (sticker.slotAspect || PLACEHOLDER_ASPECT);
 
 /** Where the anchor sits horizontally: 0 = left edge, 0.5 = centre, 1 = right edge. */
 export const anchorFraction = (el: CanvasElement): number => {
@@ -96,7 +96,8 @@ export function cropSticker(
   const fullH = (fullW * sticker.naturalHeight) / sticker.naturalWidth;
 
   // Move from the old crop's centre to the new one, in the picture's own (rotated) axes.
-  const dx = (rect.x + rect.w / 2 - (old.x + old.w / 2)) * fullW;
+  // A mirrored picture moves the other way on screen.
+  const dx = (rect.x + rect.w / 2 - (old.x + old.w / 2)) * fullW * (sticker.flipX ? -1 : 1);
   const dy = (rect.y + rect.h / 2 - (old.y + old.h / 2)) * fullH;
   const a = (sticker.rotation * Math.PI) / 180;
   const rx = dx * Math.cos(a) - dy * Math.sin(a);

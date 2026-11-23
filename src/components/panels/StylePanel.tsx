@@ -2,6 +2,7 @@ import { PanelSection } from '@/components/ui/PanelSection';
 import { Slider } from '@/components/ui/Slider';
 import { STYLE_LIMITS } from '@/constants/editor';
 import { useEditorStore } from '@/store/useEditorStore';
+import { BoxEffectsSection } from './BoxEffectsSection';
 import { BoxFadeSection } from './BoxFadeSection';
 
 export function StylePanel() {
@@ -34,6 +35,7 @@ export function StylePanel() {
       </PanelSection>
 
       <BoxFadeSection />
+      <BoxEffectsSection />
     </div>
   );
 }

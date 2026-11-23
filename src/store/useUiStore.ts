@@ -8,7 +8,7 @@ export interface MediaCrop {
   bars: CellRect | null;
 }
 
-export type PanelId = 'layout' | 'canvas' | 'style' | 'elements';
+export type PanelId = 'layout' | 'canvas' | 'style' | 'elements' | 'templates';
 export type ToastTone = 'info' | 'success' | 'error';
 
 interface Toast {
