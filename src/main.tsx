@@ -3,6 +3,9 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import './styles/index.css';
+import { initGoogleAnalytics } from './utils/googleAnalytics';
+
+initGoogleAnalytics();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
