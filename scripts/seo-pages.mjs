@@ -36,6 +36,8 @@ const COMMON_FAQ = [
 const PAGES = [
   {
     slug: 'free-photo-editor',
+    /** Where the page's buttons go (the editor opens that tool). */
+    cta: '/',
     title: 'Free Online Photo Editor – No Sign-Up, No Watermark | Koma Kit',
     description:
       'Free online photo editor that works in your browser. Add text, stickers, borders, glow and shadows, adjust colors, crop and download in HD. No login, no watermark, no uploads.',
@@ -56,6 +58,8 @@ const PAGES = [
   },
   {
     slug: 'photo-editor-no-sign-up',
+    /** Where the page's buttons go (the editor opens that tool). */
+    cta: '/',
     title: 'Photo Editor Without Login – Private, No Uploads | Koma Kit',
     description:
       'Edit photos online without login or sign-up. Koma Kit works fully in your browser, so your photos are never uploaded or shared. Free, no watermark.',
@@ -71,11 +75,14 @@ const PAGES = [
     ],
     steps: ['Open Koma Kit. No sign-up needed.', 'Add photos from your phone or computer.', 'Edit and download. Nothing is uploaded.'],
     faq: [
-      ['Does Koma Kit collect my photos?', 'No. Your photos are never sent to a server. The site only counts anonymous page visits to see how many people use it.'],
+      ['Does Koma Kit collect my photos?', 'No. Your photos and videos are never sent to a server. Koma Kit uses Google Analytics and Vercel Analytics to count visits and see which pages people use, but they never see your photos.'],
+      ['Does Koma Kit use cookies?', 'Only for visit statistics: Google Analytics sets cookies to count visitors and returning visitors. Koma Kit has no accounts, ads or tracking of what you edit.'],
     ],
   },
   {
     slug: 'anime-poster-maker',
+    /** Where the page's buttons go (the editor opens that tool). */
+    cta: '/?open=templates',
     title: 'Anime Poster Maker – Free, No Sign-Up | Koma Kit',
     description:
       'Make anime posters, character edits and announcement graphics for free. Grid layouts, bold anime fonts, logos, glow and fades. Download in HD, no watermark.',
@@ -96,6 +103,8 @@ const PAGES = [
   },
   {
     slug: 'anime-templates',
+    /** Where the page's buttons go (the editor opens that tool). */
+    cta: '/?open=templates',
     title: 'Free Anime Templates – Grids, Posters & Edits | Koma Kit',
     description:
       'Free anime templates for posts, posters and edits: panel grids, character line-ups, news banners and more. Customize online and download, no sign-up.',
@@ -116,6 +125,8 @@ const PAGES = [
   },
   {
     slug: 'photo-collage-maker',
+    /** Where the page's buttons go (the editor opens that tool). */
+    cta: '/?open=layout',
     title: 'Free Photo Collage Maker – Grid Layouts, No Sign-Up | Koma Kit',
     description:
       'Make photo collages online for free. Choose a grid layout, drag dividers, add text and stickers and download in HD. No watermark, no login, works on mobile.',
@@ -136,6 +147,8 @@ const PAGES = [
   },
   {
     slug: 'photo-mosaic-maker',
+    /** Where the page's buttons go (the editor opens that tool). */
+    cta: '/?open=mosaic',
     title: 'Free Photo Mosaic Maker Online – No Sign-Up | Koma Kit',
     description:
       'Turn one picture into a mosaic made of many small photos. Free online photo mosaic maker with color matching. Runs in your browser, no uploads, no watermark.',
@@ -227,13 +240,13 @@ function renderPage(page) {
 <body>
 <header class="top">
   <a class="brand" href="/">${LOGO}<span>Koma Kit</span></a>
-  <a class="btn small" href="/">Open editor</a>
+  <a class="btn small" href="${page.cta}">Open editor</a>
 </header>
 <main>
   <section class="hero">
     <h1>${esc(page.h1)}</h1>
     <p class="lead">${esc(page.lead)}</p>
-    <a class="btn" href="/">Start editing free</a>
+    <a class="btn" href="${page.cta}">Start editing free</a>
     <ul class="badges"><li>100% free</li><li>No sign-up</li><li>No watermark</li><li>Photos stay on your device</li></ul>
   </section>
   <section>
@@ -247,7 +260,7 @@ ${page.features.map(([t, d]) => `      <div class="card"><h3>${esc(t)}</h3><p>${
     <ol class="steps">
 ${page.steps.map((s) => `      <li>${esc(s)}</li>`).join('\n')}
     </ol>
-    <a class="btn" href="/">Open Koma Kit</a>
+    <a class="btn" href="${page.cta}">Open Koma Kit</a>
   </section>
   <section>
     <h2>Questions</h2>
