@@ -71,29 +71,77 @@
       href="https://fonts.googleapis.com/css2?family=Anton&family=Bangers&family=Bebas+Neue&family=Cinzel:wght@700&family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@900&family=Oswald:wght@700&family=Permanent+Marker&family=Playfair+Display:wght@700&display=swap"
       rel="stylesheet"
     />
+    <style>
+      /* Before the app's own styles load: dark page, centred logo, no white flash. */
+      html,
+      body,
+      #root {
+        height: 100%;
+        margin: 0;
+        background: #0a0a0a;
+      }
+      .boot {
+        display: flex;
+        height: 100%;
+        align-items: center;
+        justify-content: center;
+        animation: boot-pulse 1.2s ease-in-out infinite;
+      }
+      @keyframes boot-pulse {
+        50% {
+          opacity: 0.45;
+        }
+      }
+      .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+      }
+      .noscript {
+        position: fixed;
+        bottom: 24px;
+        left: 0;
+        right: 0;
+        text-align: center;
+        color: #a3a3a3;
+        font-family: system-ui, sans-serif;
+      }
+    </style>
   </head>
   <body>
     <div id="root">
-      <!-- Shown until the editor loads (React replaces it). Search engines also read it. -->
-      <div
-        style="display:flex;min-height:100%;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;color:#a3a3a3;font-family:system-ui,sans-serif"
-      >
-        <h1 style="margin:0 0 8px;color:#fafafa;font-size:28px">
-          Koma Kit – Free online photo editor
-        </h1>
-        <p style="margin:0 0 16px;max-width:560px">
-          Photo collage maker, anime poster maker, anime templates and photo mosaic maker.
-          No sign-up, no watermark, and your photos never leave your device.
-        </p>
-        <nav style="font-size:14px">
-          <a style="color:#fb7185" href="/free-photo-editor/">Free photo editor</a> ·
-          <a style="color:#fb7185" href="/photo-editor-no-sign-up/">Photo editor without login</a> ·
-          <a style="color:#fb7185" href="/anime-poster-maker/">Anime poster maker</a> ·
-          <a style="color:#fb7185" href="/anime-templates/">Anime templates</a> ·
-          <a style="color:#fb7185" href="/photo-collage-maker/">Photo collage maker</a> ·
-          <a style="color:#fb7185" href="/photo-mosaic-maker/">Photo mosaic maker</a>
-        </nav>
-        <noscript><p>Please turn on JavaScript to use the editor.</p></noscript>
+      <!--
+        Shown for the moment before the editor loads (React replaces it): just the logo
+        on the app's dark background, so there's no flash of text. The heading, text and
+        links are visually hidden but still read by search engines and screen readers.
+      -->
+      <div class="boot">
+        <svg viewBox="0 0 32 32" width="56" height="56" aria-hidden="true">
+          <rect x="3" y="3" width="26" height="12" rx="3" fill="#f43f5e" />
+          <rect x="3" y="17" width="12" height="12" rx="3" fill="#f5f5f5" />
+          <rect x="17" y="17" width="12" height="12" rx="3" fill="#fb7185" />
+        </svg>
+        <div class="visually-hidden">
+          <h1>Koma Kit – Free online photo editor</h1>
+          <p>
+            Photo collage maker, anime poster maker, anime templates and photo mosaic maker.
+            No sign-up, no watermark, and your photos never leave your device.
+          </p>
+          <nav>
+            <a href="/free-photo-editor/">Free photo editor</a>
+            <a href="/photo-editor-no-sign-up/">Photo editor without login</a>
+            <a href="/anime-poster-maker/">Anime poster maker</a>
+            <a href="/anime-templates/">Anime templates</a>
+            <a href="/photo-collage-maker/">Photo collage maker</a>
+            <a href="/photo-mosaic-maker/">Photo mosaic maker</a>
+          </nav>
+        </div>
+        <noscript>
+          <p class="noscript">Please turn on JavaScript to use the editor.</p>
+        </noscript>
       </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>
