@@ -3,25 +3,147 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
     <meta name="theme-color" content="#0a0a0a" />
+    <title>Koma Kit – Free Online Photo Editor, Collage & Anime Poster Maker</title>
     <meta
       name="description"
-      content="Free grid template maker for anime and pop-culture posts. Upload, adjust and download."
+      content="Free online photo editor, collage maker and anime poster maker. Grid templates, text, stickers, cut-outs and effects. No sign-up, no watermark, and your photos never leave your device."
     />
+    <link rel="canonical" href="https://koma-kit.vercel.app/" />
+
+    <!-- Link previews on WhatsApp, Instagram, X, Discord, Facebook… -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Koma Kit" />
+    <meta property="og:title" content="Koma Kit – Free Photo Editor & Anime Poster Maker" />
+    <meta
+      property="og:description"
+      content="Make collages, anime posters and edits in your browser. Free, no sign-up, no watermark, no uploads."
+    />
+    <meta property="og:url" content="https://koma-kit.vercel.app/" />
+    <meta property="og:image" content="https://koma-kit.vercel.app/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Koma Kit – Free Photo Editor & Anime Poster Maker" />
+    <meta
+      name="twitter:description"
+      content="Make collages, anime posters and edits in your browser. Free, no sign-up, no watermark, no uploads."
+    />
+    <meta name="twitter:image" content="https://koma-kit.vercel.app/og-image.png" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Koma Kit",
+        "url": "https://koma-kit.vercel.app/",
+        "description": "Free online photo editor, photo collage maker, photo mosaic maker and anime poster maker with grid templates. Works in the browser with no sign-up, no watermark and no uploads.",
+        "applicationCategory": "MultimediaApplication",
+        "applicationSubCategory": "Photo editor",
+        "operatingSystem": "Any (web browser)",
+        "browserRequirements": "Requires a modern web browser",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "featureList": [
+          "Photo collage grid templates",
+          "Anime poster and edit templates",
+          "Text with anime-style fonts",
+          "Stickers, logos and cut-outs",
+          "Borders, glow, shadow and fade effects",
+          "Brightness, contrast and saturation",
+          "Photo mosaic maker",
+          "Card sheets",
+          "Sizes for Instagram, Stories, TikTok, X, YouTube and Pinterest",
+          "PNG, JPG and MP4 download",
+          "No sign-up, no watermark, photos stay on your device"
+        ]
+      }
+    </script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Anton&family=Bangers&family=Bebas+Neue&family=Cinzel:wght@700&family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@900&family=Oswald:wght@700&family=Permanent+Marker&family=Playfair+Display:wght@700&display=swap"
       rel="stylesheet"
     />
-    <title>Koma Kit – Grid Template Maker</title>
+    <style>
+      /* Before the app's own styles load: dark page, centred logo, no white flash. */
+      html,
+      body,
+      #root {
+        height: 100%;
+        margin: 0;
+        background: #0a0a0a;
+      }
+      .boot {
+        display: flex;
+        height: 100%;
+        align-items: center;
+        justify-content: center;
+        animation: boot-pulse 1.2s ease-in-out infinite;
+      }
+      @keyframes boot-pulse {
+        50% {
+          opacity: 0.45;
+        }
+      }
+      .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+      }
+      .noscript {
+        position: fixed;
+        bottom: 24px;
+        left: 0;
+        right: 0;
+        text-align: center;
+        color: #a3a3a3;
+        font-family: system-ui, sans-serif;
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!--
+        Shown for the moment before the editor loads (React replaces it): just the logo
+        on the app's dark background, so there's no flash of text. The heading, text and
+        links are visually hidden but still read by search engines and screen readers.
+      -->
+      <div class="boot">
+        <svg viewBox="0 0 32 32" width="56" height="56" aria-hidden="true">
+          <rect x="3" y="3" width="26" height="12" rx="3" fill="#f43f5e" />
+          <rect x="3" y="17" width="12" height="12" rx="3" fill="#f5f5f5" />
+          <rect x="17" y="17" width="12" height="12" rx="3" fill="#fb7185" />
+        </svg>
+        <div class="visually-hidden">
+          <h1>Koma Kit – Free online photo editor</h1>
+          <p>
+            Photo collage maker, anime poster maker, anime templates and photo mosaic maker.
+            No sign-up, no watermark, and your photos never leave your device.
+          </p>
+          <nav>
+            <a href="/free-photo-editor/">Free photo editor</a>
+            <a href="/photo-editor-no-sign-up/">Photo editor without login</a>
+            <a href="/anime-poster-maker/">Anime poster maker</a>
+            <a href="/anime-templates/">Anime templates</a>
+            <a href="/photo-collage-maker/">Photo collage maker</a>
+            <a href="/photo-mosaic-maker/">Photo mosaic maker</a>
+          </nav>
+        </div>
+        <noscript>
+          <p class="noscript">Please turn on JavaScript to use the editor.</p>
+        </noscript>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

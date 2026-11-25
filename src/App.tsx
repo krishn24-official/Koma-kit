@@ -14,6 +14,7 @@ import { TimelineBar } from '@/components/timeline/TimelineBar';
 import { ExportProgress } from '@/components/ui/ExportProgress';
 import { Toast } from '@/components/ui/Toast';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { useDeepLink } from '@/hooks/useDeepLink';
 import { usePasteShortcut } from '@/hooks/usePaste';
 import { usePlaybackLoop } from '@/hooks/usePlaybackLoop';
 import { useVideoFormatDefault } from '@/hooks/useVideoFormatDefault';
@@ -24,6 +25,7 @@ export default function App() {
   useKeyboardShortcuts();
   usePlaybackLoop();
   usePasteShortcut();
+  useDeepLink();
   useVideoFormatDefault();
   const sheetOpen = useSheetStore((s) => s.active);
   const mosaicOpen = useMosaicStore((s) => s.active);
