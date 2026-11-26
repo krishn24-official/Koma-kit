@@ -31,6 +31,7 @@ import {
 import { useRef, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/Button';
 import { AddLogoButton } from './AddLogoButton';
+import { AddTimedPictureButton } from './AddTimedPictureButton';
 import { TrimEditor } from './TrimEditor';
 import { HiddenFileInput } from '@/components/ui/HiddenFileInput';
 import { IconButton } from '@/components/ui/IconButton';
@@ -282,6 +283,7 @@ function TimingControls({ index, item }: { index: number; item: CellMedia | null
       >
         Show new at {now}
       </Button>
+      <AddTimedPictureButton />
       {item && (
         <>
           <span className="text-xs text-neutral-400 tabular-nums">
@@ -481,6 +483,7 @@ export function CellToolbar() {
   });
   const cutout = useCutoutActions();
   const canUndoDraw = useCanUndoDraw();
+  const hasTimeline = useTimelineDuration() > 0;
   const selectedIsSticker = useEditorStore((s) => {
     const sel = s.selection;
     return (
@@ -663,6 +666,7 @@ export function CellToolbar() {
             Add layer
           </Button>
           <AddLogoButton />
+          {hasTimeline && <AddTimedPictureButton />}
           <Button size="sm" icon={<CropIcon />} onClick={crop.start}>
             Crop
           </Button>

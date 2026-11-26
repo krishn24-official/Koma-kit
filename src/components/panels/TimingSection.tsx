@@ -2,6 +2,7 @@ import { MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { PanelSection } from '@/components/ui/PanelSection';
 import { Slider } from '@/components/ui/Slider';
+import { TimeInput } from '@/components/ui/TimeInput';
 import { Toggle } from '@/components/ui/Toggle';
 import { useTimelineDuration } from '@/store/selectors';
 import { useEditorStore } from '@/store/useEditorStore';
@@ -63,6 +64,20 @@ export function TimingSection({ element }: { element: CanvasElement }) {
       timing: patch === null ? undefined : { ...(timing ?? DEFAULT_TIMING), ...patch },
     });
 
+  /** Typed or picked start: keeps it showing for a moment if the end would come first. */
+  const setFrom = (value: number) => {
+    if (!timing) return;
+    const from = Math.max(0, value);
+    const until =
+      timing.until !== null && timing.until <= from + 0.2 ? from + DEFAULT_LENGTH : timing.until;
+    set({ from, until });
+  };
+  /** Typed or picked end (null = until the end); never before the start. */
+  const setUntil = (value: number | null) => {
+    if (!timing) return;
+    set({ until: value === null ? null : Math.max(timing.from + 0.2, value) });
+  };
+
   const enable = (on: boolean) => {
     if (!on) return set(null);
     const from = currentTime;
@@ -75,63 +90,55 @@ export function TimingSection({ element }: { element: CanvasElement }) {
         <Toggle label="Show only at certain times" checked={Boolean(timing)} onChange={enable} />
         {timing && (
           <>
-            <div className="space-y-2 text-sm text-neutral-300">
+            <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <button
-                  type="button"
-                  className="tabular-nums hover:text-white"
-                  title="Go there"
-                  onClick={() => seek(timing.from)}
-                >
-                  Appears at <b className="text-white">{formatTime(timing.from)}</b>
-                </button>
+                <TimeInput
+                  label="Appears at"
+                  value={timing.from}
+                  onChange={(v) => setFrom(v ?? 0)}
+                />
                 <Button
                   size="sm"
                   variant="ghost"
                   icon={<MapPin />}
-                  onClick={() =>
-                    set({
-                      from: currentTime,
-                      // Keep it showing for a moment if the end would come first.
-                      until:
-                        timing.until !== null && timing.until <= currentTime + 0.2
-                          ? currentTime + DEFAULT_LENGTH
-                          : timing.until,
-                    })
-                  }
+                  title="Use the playhead"
+                  onClick={() => setFrom(currentTime)}
                 >
-                  Here ({formatTime(currentTime)})
+                  Here
                 </Button>
               </div>
               <div className="flex items-center justify-between gap-2">
-                <button
-                  type="button"
-                  className="tabular-nums hover:text-white"
-                  title="Go there"
-                  onClick={() => timing.until !== null && seek(Math.max(0, timing.until - 0.05))}
-                >
-                  Disappears{' '}
-                  <b className="text-white">
-                    {timing.until === null ? 'at the end' : `at ${formatTime(timing.until)}`}
-                  </b>
-                </button>
+                <TimeInput
+                  label="Disappears at"
+                  value={timing.until}
+                  emptyText="end"
+                  onChange={setUntil}
+                />
                 <div className="flex gap-1">
                   <Button
                     size="sm"
                     variant="ghost"
                     icon={<MapPin />}
+                    title="Use the playhead"
                     disabled={currentTime <= timing.from + 0.2}
-                    onClick={() => set({ until: currentTime })}
+                    onClick={() => setUntil(currentTime)}
                   >
                     Here
                   </Button>
                   {timing.until !== null && duration > 0 && (
-                    <Button size="sm" variant="ghost" onClick={() => set({ until: null })}>
+                    <Button size="sm" variant="ghost" onClick={() => setUntil(null)}>
                       To end
                     </Button>
                   )}
                 </div>
               </div>
+              <button
+                type="button"
+                className="text-xs text-neutral-500 hover:text-neutral-300"
+                onClick={() => seek(timing.from)}
+              >
+                Go to where it appears ({formatTime(timing.from)})
+              </button>
             </div>
             <TransitionPicker
               label="Comes in with"

@@ -238,6 +238,29 @@ function growLayout(s: EditorState, layoutRoot: LayoutNode): Partial<EditorState
   };
 }
 
+/**
+ * The new media for "Replace": it keeps the old item's start time. Swapping a video for
+ * another video (e.g. the same edit in another language) also keeps how it's shown and
+ * played: zoom and position, crop, delay, loop, sound on/off, and the trim when it fits
+ * the new video's length.
+ */
+function keepSettings(old: CellMedia, media: CellMedia): CellMedia {
+  if (old.kind !== 'video' || media.kind !== 'video') return { ...media, start: old.start };
+  const trimEnd = Math.min(old.trimEnd, media.duration);
+  const keepTrim = trimEnd - old.trimStart >= MIN_CLIP_LENGTH;
+  return {
+    ...media,
+    start: old.start,
+    delay: old.delay,
+    loop: old.loop,
+    muted: old.muted,
+    crop: old.crop,
+    transform: old.transform,
+    trimStart: keepTrim ? old.trimStart : 0,
+    trimEnd: keepTrim ? trimEnd : media.duration,
+  };
+}
+
 export const useEditorStore = create<EditorStore>()((set, get) => ({
   ...createInitialState(),
 
@@ -371,7 +394,7 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
       const cells = withItems(
         s.cells,
         index,
-        items.map((item) => (item.id === itemId ? { ...media, start: old.start } : item)),
+        items.map((item) => (item.id === itemId ? keepSettings(old, media) : item)),
       );
       return { cells };
     }),

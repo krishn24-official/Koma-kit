@@ -106,3 +106,19 @@ export function formatTime(seconds: number): string {
   const rest = ((tenths % 600) / 10).toFixed(1).padStart(4, '0');
   return `${minutes}:${rest}`;
 }
+
+/**
+ * Reads a typed time: "5", "5.5", "1:05", "1:05.3" (minutes:seconds) or "1:02:03"
+ * (hours:minutes:seconds). Returns seconds, or null if it isn't a time.
+ */
+export function parseTime(text: string): number | null {
+  const parts = text.trim().replace(',', '.').split(':');
+  if (parts.length === 0 || parts.length > 3 || parts.some((p) => p.trim() === '')) return null;
+  let seconds = 0;
+  for (const part of parts) {
+    const n = Number(part);
+    if (!Number.isFinite(n) || n < 0) return null;
+    seconds = seconds * 60 + n;
+  }
+  return seconds;
+}

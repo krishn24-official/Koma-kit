@@ -394,11 +394,13 @@ export function ElementEditor({ element }: { element: CanvasElement }) {
 
   return (
     <div className="space-y-6">
+      {/* Timed elements: their times come first (that's what's adjusted most). */}
+      {element.timing && <TimingSection element={element} />}
       {element.type === 'text' && <TextFields text={element} update={update} />}
       {element.type === 'sticker' && <StickerFields sticker={element} update={update} />}
       {element.type === 'badge' && <BadgeFields badge={element} update={update} />}
 
-      <TimingSection element={element} />
+      {!element.timing && <TimingSection element={element} />}
 
       <PanelSection title={element.type === 'badge' ? 'Position' : 'Size & position'}>
         <div className="space-y-4">
