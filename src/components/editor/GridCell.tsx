@@ -6,7 +6,8 @@ import { canReadClipboard, usePaste } from '@/hooks/usePaste';
 import { useActiveItem } from '@/store/selectors';
 import { useEditorStore } from '@/store/useEditorStore';
 import { useUiStore } from '@/store/useUiStore';
-import type { PixelRect } from '@/types';
+import type { PixelRect, Polygon } from '@/types';
+import { cellOutlinePath } from '@/utils/layoutMath';
 import { boxFadeCss } from '@/utils/background';
 import { adjustFilter, fadeMaskStyle, outlineFilter } from '@/utils/pictureEffects';
 import { formatTime } from '@/utils/timeline';
@@ -21,9 +22,41 @@ interface GridCellProps {
   radius: number;
   /** Preview pixels per design unit. */
   unit: number;
+  /** Slanted outline (pixels, relative to `rect`), or null for a rectangle. */
+  polygon: Polygon | null;
 }
 
-export function GridCell({ index, rect, radius, unit }: GridCellProps) {
+/** Outline in the box (slanted shape, or rounded rectangle), stroked just inside. */
+function BoxOutline({
+  d,
+  width,
+  height,
+  stroke,
+  color,
+}: {
+  d: string;
+  width: number;
+  height: number;
+  stroke: number;
+  color: string;
+}) {
+  return (
+    <svg
+      width={width}
+      height={height}
+      className="pointer-events-none absolute inset-0 overflow-visible"
+      style={{ clipPath: `path('${d}')` }}
+      aria-hidden
+    >
+      <path d={d} fill="none" stroke={color} strokeWidth={stroke * 2} strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function GridCell({ index, rect, radius, unit, polygon }: GridCellProps) {
+  // Slanted boxes are cut to their outline (clicks outside it reach the box behind).
+  const outline = cellOutlinePath({ ...rect, polygon }, radius);
+  const clipPath = polygon ? `path('${outline}')` : undefined;
   const items = useEditorStore((s) => s.cells[index]);
   const item = useActiveItem(index);
   const isSelected = useEditorStore(
@@ -86,7 +119,11 @@ export function GridCell({ index, rect, radius, unit }: GridCellProps) {
     >
       <div
         className="absolute inset-0 overflow-hidden"
-        style={{ borderRadius: radius, ...(effects ? fadeMaskStyle(effects.fade) : {}) }}
+        style={{
+          borderRadius: polygon ? undefined : radius,
+          clipPath,
+          ...(effects ? fadeMaskStyle(effects.fade) : {}),
+        }}
         onPointerDown={handlePointerDown}
         onDragOver={handleDragOver}
         onDragLeave={() => setIsDragOver(false)}
@@ -137,15 +174,43 @@ export function GridCell({ index, rect, radius, unit }: GridCellProps) {
           </div>
         )}
 
-        {showRing && (
-          <div
-            className="pointer-events-none absolute inset-0 ring-2 ring-brand-500 ring-inset"
-            style={{ borderRadius: radius }}
-          />
-        )}
+        {showRing &&
+          (polygon ? (
+            <BoxOutline
+              d={outline}
+              width={rect.width}
+              height={rect.height}
+              stroke={2}
+              color="rgb(244 63 94)"
+            />
+          ) : (
+            <div
+              className="pointer-events-none absolute inset-0 ring-2 ring-brand-500 ring-inset"
+              style={{ borderRadius: radius }}
+            />
+          ))}
 
         <HiddenFileInput ref={inputRef} multiple onFiles={(files) => uploadToCell(index, files)} />
       </div>
+      {effects && effects.border.width > 0 && polygon && (
+        <BoxOutline
+          d={outline}
+          width={rect.width}
+          height={rect.height}
+          stroke={effects.border.width * unit}
+          color={effects.border.color}
+        />
+      )}
+      {effects && effects.border.width > 0 && !polygon && (
+        // The box border, on top of the (possibly faded) picture, like the download.
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            borderRadius: radius,
+            boxShadow: `inset 0 0 0 ${effects.border.width * unit}px ${effects.border.color}`,
+          }}
+        />
+      )}
     </div>
   );
 }

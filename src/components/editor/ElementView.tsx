@@ -3,14 +3,17 @@ import { ImagePlus } from 'lucide-react';
 import { useRef, type CSSProperties } from 'react';
 import { HiddenFileInput } from '@/components/ui/HiddenFileInput';
 import { useStickerUpload } from '@/hooks/useStickerUpload';
+import { useTimelineDuration } from '@/store/selectors';
 import { useEditorStore } from '@/store/useEditorStore';
+import { usePlaybackStore } from '@/store/usePlaybackStore';
+import { getAppearance } from '@/utils/elementTiming';
 import { useUiStore } from '@/store/useUiStore';
 import type { BadgeElement, CanvasElement, Size, StickerElement, TextElement } from '@/types';
 import { cn } from '@/utils/cn';
 import { anchorFraction, scaleElement, stickerHeight } from '@/utils/elements';
 import { clamp } from '@/utils/math';
 import { adjustFilter, fadeMaskStyle, outlineFilter } from '@/utils/pictureEffects';
-import { shapeClipPath } from '@/utils/stickerShape';
+import { clipsPicture, shapeClipPath, shapePath } from '@/utils/stickerShape';
 import { getBadgeRenderStyle, getTextRenderStyle } from '@/utils/textStyle';
 import { CropFrame } from './CropFrame';
 
@@ -45,6 +48,44 @@ const fullPictureSize = (sticker: StickerElement, unit: number) => {
   return { width, height: (width * sticker.naturalHeight) / sticker.naturalWidth };
 };
 
+/** The border: an SVG stroke along the shape, clipped to it so it sits just inside. */
+function ShapeBorder({
+  sticker,
+  width,
+  height,
+  unit,
+  dashed = false,
+}: {
+  sticker: StickerElement;
+  width: number;
+  height: number;
+  unit: number;
+  /** Placeholder outline for an empty frame without a border. */
+  dashed?: boolean;
+}) {
+  const stroke = dashed ? 2 : sticker.border.width * unit;
+  if (stroke <= 0) return null;
+  const d = shapePath(sticker.shape, width, height, sticker.points);
+  return (
+    <svg
+      width={width}
+      height={height}
+      className="pointer-events-none absolute inset-0 overflow-visible"
+      style={{ clipPath: `path('${d}')` }}
+      aria-hidden
+    >
+      <path
+        d={d}
+        fill="none"
+        stroke={dashed ? 'rgb(255 255 255 / 0.7)' : sticker.border.color}
+        strokeWidth={stroke * 2}
+        strokeLinejoin="round"
+        strokeDasharray={dashed ? '8 6' : undefined}
+      />
+    </svg>
+  );
+}
+
 function StickerContent({
   sticker,
   unit,
@@ -52,53 +93,75 @@ function StickerContent({
 }: {
   sticker: StickerElement;
   unit: number;
-  /** Without effects or flip (while cropping, the crop frame shows the plain picture). */
+  /** Without effects, shape or flip (while cropping, the crop frame shows the plain picture). */
   plain: boolean;
 }) {
   const width = sticker.width * unit;
   const height = stickerHeight(sticker) * unit;
+  const clipPath = shapeClipPath(sticker.shape, width, height, sticker.points);
+
   if (sticker.src) {
     // Show only the cropped part: the full picture, shifted inside a clipping box.
-    // Layers (outside in): glow/shadow → edge-fade mask → mirror + clip → picture colors.
+    // Layers (outside in): glow/shadow → [edge-fade mask → shape clip → mirror → picture
+    // colors] + border on top (not faded), like the download.
     const full = fullPictureSize(sticker, unit);
     return (
       <div style={{ filter: plain ? undefined : outlineFilter(sticker, unit) }}>
-        <div style={plain ? undefined : fadeMaskStyle(sticker.fade)}>
-          <div
-            className="relative overflow-hidden"
-            style={{
-              width,
-              height,
-              transform: sticker.flipX && !plain ? 'scaleX(-1)' : undefined,
-              clipPath: plain ? undefined : shapeClipPath(sticker.shape, width, height),
-            }}
-          >
-            <img
-              src={sticker.src}
-              alt=""
-              draggable={false}
-              className="absolute block max-w-none select-none"
-              style={{
-                width: full.width,
-                height: full.height,
-                left: -sticker.crop.x * full.width,
-                top: -sticker.crop.y * full.height,
-                filter: plain ? undefined : adjustFilter(sticker.adjust),
-              }}
-            />
+        <div className="relative" style={{ width, height }}>
+          <div style={plain ? undefined : fadeMaskStyle(sticker.fade)}>
+            <div
+              className="relative overflow-hidden"
+              style={{ width, height, clipPath: plain ? undefined : clipPath }}
+            >
+              <div
+                className="absolute inset-0"
+                style={{ transform: sticker.flipX && !plain ? 'scaleX(-1)' : undefined }}
+              >
+                <img
+                  src={sticker.src}
+                  alt=""
+                  draggable={false}
+                  className="absolute block max-w-none select-none"
+                  style={{
+                    width: full.width,
+                    height: full.height,
+                    left: -sticker.crop.x * full.width,
+                    top: -sticker.crop.y * full.height,
+                    filter: plain ? undefined : adjustFilter(sticker.adjust),
+                  }}
+                />
+              </div>
+            </div>
           </div>
+          {!plain && <ShapeBorder sticker={sticker} width={width} height={height} unit={unit} />}
         </div>
       </div>
     );
   }
+
   // Empty slot: shown in the editor only, never exported.
+  const shaped = clipsPicture(sticker.shape);
   return (
-    <div
-      className="flex flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed border-white/60 bg-black/30 text-white/90"
-      style={{ width, height, fontSize: clamp(height * 0.18, 9, 16) }}
-    >
-      <ImagePlus style={{ width: '1.6em', height: '1.6em' }} aria-hidden />
-      <span className="font-medium whitespace-nowrap">{sticker.label}</span>
+    <div className="relative" style={{ width, height }}>
+      <div
+        className={cn(
+          'flex size-full flex-col items-center justify-center gap-1 text-white/90',
+          shaped ? 'bg-white/15' : 'rounded-md border-2 border-dashed border-white/60 bg-black/30',
+        )}
+        style={{ clipPath, fontSize: clamp(Math.min(width, height) * 0.14, 9, 16) }}
+      >
+        <ImagePlus style={{ width: '1.6em', height: '1.6em' }} aria-hidden />
+        <span className="font-medium whitespace-nowrap">{sticker.label}</span>
+      </div>
+      {shaped && (
+        <ShapeBorder
+          sticker={sticker}
+          width={width}
+          height={height}
+          unit={unit}
+          dashed={sticker.border.width <= 0}
+        />
+      )}
     </div>
   );
 }
@@ -256,15 +319,26 @@ export function ElementView({ element, unit, canvasSize }: ElementViewProps) {
     { pointer: { capture: true } },
   );
 
+  // Timed elements follow the playhead (others don't re-render while playing).
+  const time = usePlaybackStore((s) => (element.timing ? s.currentTime : 0));
+  const timelineEnd = useTimelineDuration();
+
   if (element.hidden) return null;
+
+  const look = getAppearance(element, time, timelineEnd);
+  // Outside its time it's hidden, except while selected (shown faintly to edit it).
+  if (!look.visible && !isSelected) return null;
 
   const a = anchorFraction(element);
   const style: CSSProperties = {
-    left: element.x * canvasSize.width,
-    top: element.y * canvasSize.height,
-    transform: `translate(${-a * 100}%, -50%) rotate(${element.rotation}deg)`,
+    left: (element.x + look.dx) * canvasSize.width,
+    top: (element.y + look.dy) * canvasSize.height,
+    transform:
+      `translate(${-a * 100}%, -50%) rotate(${element.rotation}deg)` +
+      (look.scale !== 1 ? ` scale(${look.scale})` : ''),
     transformOrigin: `${a * 100}% 50%`,
-    opacity: element.opacity,
+    opacity: element.opacity * (look.visible ? look.opacity : 0.3),
+    filter: look.blur > 0 ? `blur(${look.blur * unit}px)` : undefined,
   };
 
   return (

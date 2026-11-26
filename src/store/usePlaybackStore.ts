@@ -57,7 +57,7 @@ interface PlaybackActions {
 /** Timeline length for the current editor state. */
 export const getCurrentDuration = (): number => {
   const s = useEditorStore.getState();
-  return getTimelineDuration(s.cells, countCells(s.layoutRoot));
+  return getTimelineDuration(s.cells, countCells(s.layoutRoot), s.elements);
 };
 
 export const usePlaybackStore = create<PlaybackState & PlaybackActions>()((set, get) => ({

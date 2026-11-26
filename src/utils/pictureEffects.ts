@@ -12,7 +12,7 @@ import type { CSSProperties } from 'react';
 import type { PictureEffects, StickerAdjust, StickerElement, StickerFade } from '@/types';
 import { hexToRgba } from './background';
 import { stickerHeight } from './elements';
-import { clipToShape } from './stickerShape';
+import { clipToShape, shapePath, strokeShapeBorder } from './stickerShape';
 
 const SIDES = ['top', 'bottom', 'left', 'right'] as const;
 /** CSS gradient direction that starts at each side. */
@@ -177,7 +177,7 @@ export const hasOutline = (e: Pick<PictureEffects, 'glow' | 'shadow'>): boolean 
   e.glow.strength > 0 || e.shadow.strength > 0;
 
 export const hasEffects = (e: PictureEffects): boolean =>
-  hasFade(e.fade) || hasAdjust(e.adjust) || hasOutline(e);
+  e.border.width > 0 || hasFade(e.fade) || hasAdjust(e.adjust) || hasOutline(e);
 
 /** A sticker drawn with all its effects, and where its top-left goes relative to its centre. */
 export interface StickerLayer {
@@ -207,7 +207,7 @@ export function renderStickerLayer(
 
   const base = makeCanvas(w, h);
   base.ctx.imageSmoothingQuality = 'high';
-  clipToShape(base.ctx, sticker.shape, w, h);
+  clipToShape(base.ctx, sticker, w, h);
   if (sticker.flipX) {
     base.ctx.translate(w, 0);
     base.ctx.scale(-1, 1);
@@ -216,6 +216,13 @@ export function renderStickerLayer(
   base.ctx.setTransform(1, 0, 0, 1, 0, 0);
   if (hasAdjust(sticker.adjust)) applyAdjust(base.ctx, w, h, sticker.adjust);
   if (hasFade(sticker.fade)) applyFade(base.ctx, w, h, sticker.fade);
+  // The border isn't faded: it's drawn after the fade, just inside the shape's edge.
+  strokeShapeBorder(
+    base.ctx,
+    shapePath(sticker.shape, w, h, sticker.points),
+    sticker.border.width * unit,
+    sticker.border.color,
+  );
 
   const outlined = addOutline(base.canvas, sticker, unit);
   const layer = {

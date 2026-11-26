@@ -13,7 +13,7 @@ import { drawBackground, drawBoxFade } from './background';
 import { drawElements } from './drawElements';
 import { elementFonts } from './elements';
 import { getImageRect, getImageSize } from './imageTransform';
-import { getCellRects } from './layoutMath';
+import { cellOutlinePath, getCellShapes } from './layoutMath';
 import { loadImage, loadVideoFrame, releaseVideo, sourceSize } from './media';
 import {
   addOutline,
@@ -24,7 +24,8 @@ import {
   hasFade,
   makeCanvas,
 } from './pictureEffects';
-import { getActiveItem, getVideoLocalTime } from './timeline';
+import { strokeShapeBorder } from './stickerShape';
+import { getActiveItem, getTimelineDuration, getVideoLocalTime } from './timeline';
 
 export interface TemplateSnapshot {
   layout: ResolvedLayout;
@@ -43,22 +44,6 @@ export type MediaResolver = (item: CellMedia) => CanvasImageSource | null;
 export interface DrawAssets {
   background: CanvasImageSource | null;
   stickers: Map<string, CanvasImageSource>;
-}
-
-function traceRoundedRect(ctx: CanvasRenderingContext2D, rect: PixelRect, radius: number): void {
-  const { x, y, width: w, height: h } = rect;
-  const r = Math.max(0, Math.min(radius, w / 2, h / 2));
-  ctx.beginPath();
-  if (r === 0) {
-    ctx.rect(x, y, w, h);
-    return;
-  }
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + w, y, x + w, y + h, r);
-  ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r);
-  ctx.arcTo(x, y, x + w, y, r);
-  ctx.closePath();
 }
 
 /** Draws a box's picture/frame (cropped, zoomed, panned) into `rect`. Call inside its clip. */
@@ -92,7 +77,8 @@ function drawMedia(
 function drawBoxWithEffects(
   ctx: CanvasRenderingContext2D,
   rect: PixelRect,
-  radius: number,
+  /** The box's outline as a path relative to `rect` (see cellOutlinePath). */
+  outline: string,
   item: CellMedia,
   source: CanvasImageSource,
   fade: BoxFade | undefined,
@@ -105,12 +91,12 @@ function drawBoxWithEffects(
   const box = makeCanvas(w, h);
   box.ctx.imageSmoothingEnabled = true;
   box.ctx.imageSmoothingQuality = 'high';
-  traceRoundedRect(box.ctx, local, radius);
-  box.ctx.clip();
+  box.ctx.clip(new Path2D(outline));
   drawMedia(box.ctx, local, item, source);
   if (hasAdjust(effects.adjust)) applyAdjust(box.ctx, w, h, effects.adjust);
   if (fade) drawBoxFade(box.ctx, local, fade);
   if (hasFade(effects.fade)) applyFade(box.ctx, w, h, effects.fade);
+  strokeShapeBorder(box.ctx, outline, effects.border.width * unit, effects.border.color);
   const outlined = addOutline(box.canvas, effects, unit);
   ctx.drawImage(outlined.canvas, rect.x - outlined.offset, rect.y - outlined.offset);
 }
@@ -160,7 +146,7 @@ export function drawTemplate(
 ): void {
   const { layout, aspectRatio, style, cells, boxFades, boxEffects, elements } = snapshot;
   const unit = size.width / aspectRatio.width;
-  const rects = getCellRects(layout.cells, size, style, unit);
+  const rects = getCellShapes(layout, size, style, unit);
 
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
@@ -172,20 +158,24 @@ export function drawTemplate(
     const fade = boxFades[i];
     if (!(item && source) && !fade) return;
     const effects = boxEffects[i];
+    // The box's outline: its slanted shape, or the rectangle with rounded corners.
+    const outline = cellOutlinePath(rect, style.radius * unit);
     if (item && source && effects && hasEffects(effects)) {
-      drawBoxWithEffects(ctx, rect, style.radius * unit, item, source, fade, effects, unit);
+      drawBoxWithEffects(ctx, rect, outline, item, source, fade, effects, unit);
       return;
     }
 
     ctx.save();
-    traceRoundedRect(ctx, rect, style.radius * unit);
-    ctx.clip();
+    ctx.translate(rect.x, rect.y);
+    ctx.clip(new Path2D(outline));
+    ctx.translate(-rect.x, -rect.y);
     if (item && source) drawMedia(ctx, rect, item, source);
     if (fade) drawBoxFade(ctx, rect, fade);
     ctx.restore();
   });
 
-  drawElements(ctx, elements, size, unit, assets.stickers);
+  const end = getTimelineDuration(cells, layout.cells.length, elements);
+  drawElements(ctx, elements, size, unit, assets.stickers, time, end);
 }
 
 /** Renders a still image of the template at timeline `time` and resolution `scale`. */

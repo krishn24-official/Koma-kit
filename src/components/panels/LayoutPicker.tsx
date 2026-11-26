@@ -30,7 +30,7 @@ export function LayoutPicker() {
                 : 'border-neutral-800 text-neutral-600 hover:border-neutral-600 hover:text-neutral-400',
             )}
           >
-            <LayoutThumbnail cells={resolveLayout(layout.root).cells} ratio={ratio} />
+            <LayoutThumbnail layout={resolveLayout(layout.root)} ratio={ratio} />
           </button>
         );
       })}

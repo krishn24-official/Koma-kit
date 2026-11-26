@@ -69,7 +69,7 @@ export async function exportVideo(
   const { fps, signal } = options;
   const cellCount = layout.cells.length;
 
-  const duration = getTimelineDuration(cells, cellCount);
+  const duration = getTimelineDuration(cells, cellCount, snapshot.elements);
   if (duration <= 0) throw new Error('Add a video to export an MP4');
 
   const width = even(options.width);
@@ -257,8 +257,12 @@ function clipSegment(clip: AudioClip, duration: number) {
   const { item, cellItems } = clip;
   const playStart = getPlayStart(item);
   const next = cellItems[cellItems.indexOf(item) + 1];
-  const end = Math.min(duration, playStart + getPlayLength(item), next?.start ?? Infinity);
-  return { playStart, from: item.trimStart, to: item.trimStart + Math.max(0, end - playStart) };
+  // A looping clip repeats until the next item in its box or the end of the video.
+  const end = item.loop
+    ? Math.min(duration, next?.start ?? Infinity)
+    : Math.min(duration, playStart + getPlayLength(item), next?.start ?? Infinity);
+  const to = item.loop ? item.trimEnd : item.trimStart + Math.max(0, end - playStart);
+  return { playStart, end, from: item.trimStart, to };
 }
 
 /**
@@ -308,13 +312,23 @@ async function writeMixedAudio(
   const mixer = new OfflineAudioContext(MIX_CHANNELS, length, MIX_SAMPLE_RATE);
 
   for (const clip of clips) {
-    const { playStart, from, to } = clipSegment(clip, duration);
+    const { playStart, end, from, to } = clipSegment(clip, duration);
+    if (end <= playStart) continue;
     const buffer = await readAudioRange(clip.track, from, to, signal);
     if (!buffer) continue;
     const node = mixer.createBufferSource();
     node.buffer = buffer;
     node.connect(mixer.destination);
-    node.start(playStart);
+    if (clip.item.loop) {
+      // One pass of the trimmed sound, repeated until the clip's end.
+      node.loop = true;
+      node.loopStart = 0;
+      node.loopEnd = buffer.duration;
+      node.start(playStart);
+      node.stop(end);
+    } else {
+      node.start(playStart);
+    }
   }
   throwIfAborted(signal);
 

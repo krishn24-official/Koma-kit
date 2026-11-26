@@ -4,13 +4,14 @@ import { useCurrentAspectRatio, useCurrentLayout } from '@/store/selectors';
 import { useEditorStore } from '@/store/useEditorStore';
 import { useUiStore } from '@/store/useUiStore';
 import { gradientCss } from '@/utils/background';
-import { getCellRects } from '@/utils/layoutMath';
+import { getCellShapes } from '@/utils/layoutMath';
 import { CanvasBackground } from './CanvasBackground';
 import { CanvasResizeHandles } from './CanvasResizeHandles';
 import { CropOverlay } from './CropOverlay';
 import { GridCell } from './GridCell';
 import { LayoutDividers } from './LayoutDividers';
 import { ElementView } from './ElementView';
+import { FrameDrawOverlay } from './FrameDrawOverlay';
 
 /** Space kept around the canvas for its resize grips. */
 const HANDLE_ROOM = 24;
@@ -41,8 +42,8 @@ export function TemplateCanvas() {
 
   const rects = useMemo(
     () =>
-      getCellRects(
-        layout.cells,
+      getCellShapes(
+        layout,
         { width: aspectRatio.width * unit, height: aspectRatio.height * unit },
         style,
         unit,
@@ -78,6 +79,7 @@ export function TemplateCanvas() {
                 rect={rect}
                 radius={style.radius * unit}
                 unit={unit}
+                polygon={rect.polygon}
               />
             ))}
 
@@ -93,6 +95,7 @@ export function TemplateCanvas() {
                 />
               ))}
             </div>
+            <FrameDrawOverlay size={canvasSize} />
           </div>
 
           {isCropping ? (

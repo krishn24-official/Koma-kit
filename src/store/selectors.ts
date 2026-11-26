@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { toDesignSize } from '@/constants/canvasSizes';
 import type { AspectRatio, CanvasElement, CellMedia, PixelRect, ResolvedLayout } from '@/types';
-import { getCellRects } from '@/utils/layoutMath';
+import { getCellShapes } from '@/utils/layoutMath';
 import { resolveLayout } from '@/utils/layoutTree';
 import type { TemplateSnapshot } from '@/utils/renderToCanvas';
 import { getActiveItemIndex, getTimelineDuration } from '@/utils/timeline';
@@ -36,7 +36,7 @@ export const useFilledCellCount = (): number => {
 /** Timeline length in seconds; 0 when the template has no video or scheduled images. */
 export const useTimelineDuration = (): number => {
   const cellCount = useCurrentLayout().cells.length;
-  return useEditorStore((s) => getTimelineDuration(s.cells, cellCount));
+  return useEditorStore((s) => getTimelineDuration(s.cells, cellCount, s.elements));
 };
 
 /** True if any visible cell holds a video. */
@@ -64,10 +64,7 @@ export const useDesignCellRects = (): PixelRect[] => {
   const layout = useCurrentLayout();
   const aspectRatio = useCurrentAspectRatio();
   const style = useEditorStore((s) => s.style);
-  return useMemo(
-    () => getCellRects(layout.cells, aspectRatio, style, 1),
-    [layout, aspectRatio, style],
-  );
+  return useMemo(() => getCellShapes(layout, aspectRatio, style, 1), [layout, aspectRatio, style]);
 };
 
 /** Everything the exporters need, read once at export time (not a hook). */

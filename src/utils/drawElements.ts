@@ -1,4 +1,5 @@
 import type { BadgeElement, CanvasElement, Size, StickerElement, TextElement } from '@/types';
+import { getAppearance } from './elementTiming';
 import { renderStickerLayer } from './pictureEffects';
 import { getBadgeRenderStyle, getTextRenderStyle } from './textStyle';
 
@@ -108,20 +109,30 @@ function drawBadge(ctx: Ctx, badge: BadgeElement, unit: number) {
   ctx.fillText(badge.text, s.letterSpacing / 2, 0);
 }
 
-/** Draws every element in order (later ones on top). */
+/**
+ * Draws every element in order (later ones on top), as it looks at timeline time `time`
+ * (timed elements may be hidden, fading, sliding…). `timelineEnd` is the timeline length.
+ */
 export function drawElements(
   ctx: Ctx,
   elements: CanvasElement[],
   size: Size,
   unit: number,
   stickers: Map<string, CanvasImageSource>,
+  time = 0,
+  timelineEnd = 0,
 ): void {
   for (const el of elements) {
     if (el.hidden) continue;
+    const look = getAppearance(el, time, timelineEnd);
+    if (!look.visible || look.opacity <= 0) continue;
     ctx.save();
-    ctx.globalAlpha = el.opacity;
-    ctx.translate(el.x * size.width, el.y * size.height);
+    ctx.globalAlpha = el.opacity * look.opacity;
+    ctx.translate((el.x + look.dx) * size.width, (el.y + look.dy) * size.height);
     ctx.rotate((el.rotation * Math.PI) / 180);
+    if (look.scale !== 1) ctx.scale(look.scale, look.scale);
+    // Blur-in/out (browsers without canvas filters just fade).
+    if (look.blur > 0 && 'filter' in ctx) ctx.filter = `blur(${look.blur * unit}px)`;
     if (el.type === 'text') drawText(ctx, el, unit);
     else if (el.type === 'sticker') drawSticker(ctx, el, unit, stickers.get(el.id));
     else drawBadge(ctx, el, unit);

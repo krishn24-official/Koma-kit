@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/Button';
 import { ColorPicker } from '@/components/ui/ColorPicker';
 import { PanelSection } from '@/components/ui/PanelSection';
 import { Slider } from '@/components/ui/Slider';
-import { DEFAULT_GLOW, DEFAULT_SHADOW, NO_ADJUST, NO_FADE } from '@/constants/elements';
+import { DEFAULT_GLOW, DEFAULT_SHADOW, NO_ADJUST, NO_BORDER, NO_FADE } from '@/constants/elements';
 import type {
   PictureEffects,
   StickerAdjust,
@@ -12,6 +12,16 @@ import type {
   StickerShadow,
 } from '@/types';
 import { hasAdjust, hasFade } from '@/utils/pictureEffects';
+
+const BORDER_SWATCHES = [
+  '#ffffff',
+  '#000000',
+  '#f5f0e6',
+  '#e11d48',
+  '#f59e0b',
+  '#38bdf8',
+  '#a855f7',
+];
 
 const percent = (v: number) => `${Math.round(v * 100)}%`;
 
@@ -46,7 +56,7 @@ interface EffectsSectionsProps {
  * Used for pictures on the canvas and for grid boxes.
  */
 export function EffectsSections({ effects, update, prefix }: EffectsSectionsProps) {
-  const { fade, glow, shadow, adjust } = effects;
+  const { border, fade, glow, shadow, adjust } = effects;
   const title = (name: string) => (prefix ? `${prefix} ${name.toLowerCase()}` : name);
   const setFade = (patch: Partial<StickerFade>) => update({ fade: { ...fade, ...patch } });
   const setGlow = (patch: Partial<StickerGlow>) => update({ glow: { ...glow, ...patch } });
@@ -55,6 +65,37 @@ export function EffectsSections({ effects, update, prefix }: EffectsSectionsProp
 
   return (
     <>
+      <PanelSection
+        title={title('Border')}
+        action={
+          border.width > 0 && (
+            <ResetButton
+              onClick={() => update({ border: { ...NO_BORDER, color: border.color } })}
+            />
+          )
+        }
+      >
+        <div className="space-y-4">
+          <Slider
+            label="Width"
+            min={0}
+            max={40}
+            step={0.5}
+            value={border.width}
+            onChange={(width) => update({ border: { ...border, width } })}
+            formatValue={(v) => String(Math.round(v * 10) / 10)}
+          />
+          {border.width > 0 && (
+            <ColorPicker
+              label="Border color"
+              value={border.color}
+              swatches={BORDER_SWATCHES}
+              onChange={(color) => update({ border: { ...border, color } })}
+            />
+          )}
+        </div>
+      </PanelSection>
+
       <PanelSection
         title={title('Fade edges')}
         action={hasFade(fade) && <ResetButton onClick={() => update({ fade: { ...NO_FADE } })} />}

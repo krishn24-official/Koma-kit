@@ -9,6 +9,9 @@ import {
   Crop,
   FlipHorizontal2,
   ImagePlus,
+  PenTool,
+  Scissors,
+  SquarePlus,
   ZoomIn,
   ZoomOut,
   Trash2,
@@ -30,9 +33,12 @@ import { useEditorStore } from '@/store/useEditorStore';
 import type { BadgeElement, CanvasElement, StickerElement, TextAlign, TextElement } from '@/types';
 import { badgeHeight, maxBadgeTextSize, resizeBadge, setBadgeTextSize } from '@/utils/elements';
 import { cn } from '@/utils/cn';
-import { SHAPES, setStickerShape, shapeClipPath, zoomSticker } from '@/utils/stickerShape';
+import { isFrame, SHAPES, setStickerShape, shapeClipPath, zoomSticker } from '@/utils/stickerShape';
+import { useFrameDraw } from '@/hooks/useFrameDraw';
+import { isPiece, useCutoutActions } from '@/hooks/useCutoutActions';
 import { EffectsSections } from './EffectsSections';
 import { FontPicker } from './FontPicker';
+import { TimingSection } from './TimingSection';
 
 type Update<T> = (patch: Partial<T>) => void;
 
@@ -119,6 +125,9 @@ function StickerFields({
 }) {
   const uploadSticker = useStickerUpload();
   const { start: startCrop } = useStickerCrop();
+  const { start: drawFrame } = useFrameDraw();
+  const { removeOriginal, moveToNewBox } = useCutoutActions();
+  const frame = isFrame(sticker);
   const inputRef = useRef<HTMLInputElement>(null);
   return (
     <>
@@ -145,12 +154,14 @@ function StickerFields({
               <Button icon={<ZoomIn />} onClick={() => update(zoomSticker(sticker, 1.15))}>
                 Zoom in
               </Button>
-              <Button
-                className="col-span-2"
-                icon={<FlipHorizontal2 />}
-                onClick={() => update({ flipX: !sticker.flipX })}
-              >
+              <Button icon={<FlipHorizontal2 />} onClick={() => update({ flipX: !sticker.flipX })}>
                 Flip
+              </Button>
+              <Button
+                icon={<Scissors />}
+                onClick={() => drawFrame({ kind: 'element', id: sticker.id })}
+              >
+                Cut out
               </Button>
             </>
           )}
@@ -161,7 +172,21 @@ function StickerFields({
           onFiles={(files) => uploadSticker(sticker.id, files)}
         />
       </PanelSection>
-      {sticker.src && (
+      {isPiece(sticker) && (
+        <PanelSection title="Cut-out">
+          <div className={sticker.cutFrom ? 'grid grid-cols-2 gap-2' : undefined}>
+            {sticker.cutFrom && (
+              <Button variant="danger" icon={<Trash2 />} onClick={() => removeOriginal(sticker)}>
+                Remove original
+              </Button>
+            )}
+            <Button fullWidth icon={<SquarePlus />} onClick={() => void moveToNewBox(sticker)}>
+              Move to new box
+            </Button>
+          </div>
+        </PanelSection>
+      )}
+      {(sticker.src || frame) && (
         <PanelSection title="Shape">
           <div className="grid grid-cols-3 gap-2">
             {SHAPES.map(({ id, label }) => (
@@ -185,10 +210,24 @@ function StickerFields({
                 {label}
               </button>
             ))}
+            <button
+              type="button"
+              aria-pressed={sticker.shape === 'custom'}
+              onClick={() => drawFrame({ kind: 'element', id: sticker.id })}
+              className={cn(
+                'flex flex-col items-center gap-1.5 rounded-lg border py-2 text-xs transition-colors',
+                sticker.shape === 'custom'
+                  ? 'border-brand-500 bg-brand-500/10 text-white'
+                  : 'border-neutral-800 text-neutral-300 hover:border-neutral-600',
+              )}
+            >
+              <PenTool className="size-7 p-1 text-neutral-300" aria-hidden />
+              {sticker.src ? 'Cut out' : sticker.shape === 'custom' ? 'Redraw' : 'Draw'}
+            </button>
           </div>
         </PanelSection>
       )}
-      {sticker.src && <EffectsSections effects={sticker} update={update} />}
+      {(sticker.src || frame) && <EffectsSections effects={sticker} update={update} />}
     </>
   );
 }
@@ -355,9 +394,13 @@ export function ElementEditor({ element }: { element: CanvasElement }) {
 
   return (
     <div className="space-y-6">
+      {/* Timed elements: their times come first (that's what's adjusted most). */}
+      {element.timing && <TimingSection element={element} />}
       {element.type === 'text' && <TextFields text={element} update={update} />}
       {element.type === 'sticker' && <StickerFields sticker={element} update={update} />}
       {element.type === 'badge' && <BadgeFields badge={element} update={update} />}
+
+      {!element.timing && <TimingSection element={element} />}
 
       <PanelSection title={element.type === 'badge' ? 'Position' : 'Size & position'}>
         <div className="space-y-4">

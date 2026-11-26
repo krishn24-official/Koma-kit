@@ -1,5 +1,6 @@
 import {
   Eye,
+  GalleryHorizontalEnd,
   EyeOff,
   ImagePlus,
   Images,
@@ -7,18 +8,20 @@ import {
   Lock,
   LockOpen,
   RectangleHorizontal,
+  Timer,
   Type,
   type LucideIcon,
 } from 'lucide-react';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { HiddenFileInput } from '@/components/ui/HiddenFileInput';
 import { PanelSection } from '@/components/ui/PanelSection';
 import { createBadge, createText } from '@/constants/elements';
+import { FrameButtons } from '@/components/editor/FrameButtons';
 import { IconButton } from '@/components/ui/IconButton';
 import { NumberStepper } from '@/components/ui/NumberStepper';
 import { toDesignSize } from '@/constants/canvasSizes';
-import { useAddPictures, useStickerUpload } from '@/hooks/useStickerUpload';
+import { useAddPictures, useSlideshow, useStickerUpload } from '@/hooks/useStickerUpload';
 import { useSelectedElement } from '@/store/selectors';
 import { useEditorStore } from '@/store/useEditorStore';
 import type { CanvasElement, ElementType } from '@/types';
@@ -26,6 +29,7 @@ import { cn } from '@/utils/cn';
 import { isCharacter, MAX_CHARACTERS, setCharacterCount } from '@/utils/characterSlots';
 import { describeElement } from '@/utils/elements';
 import { ElementEditor } from './ElementEditor';
+import { TimedImageDialog } from './TimedImageDialog';
 
 const TYPE_ICON: Record<ElementType, LucideIcon> = {
   text: Type,
@@ -40,6 +44,9 @@ export function ElementsPanel() {
   const updateElement = useEditorStore((s) => s.updateElement);
   const addPictures = useAddPictures();
   const picturesRef = useRef<HTMLInputElement>(null);
+  const slideshowRef = useRef<HTMLInputElement>(null);
+  const [timerOpen, setTimerOpen] = useState(false);
+  const addSlideshow = useSlideshow();
   const characterCount = useEditorStore((s) => s.elements.filter(isCharacter).length);
 
   /** Adds/removes character boxes to reach `count` and arranges them in a pyramid. */
@@ -88,6 +95,31 @@ export function ElementsPanel() {
         >
           Characters
         </Button>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <FrameButtons />
+        </div>
+        <Button
+          size="sm"
+          fullWidth
+          className="mt-2"
+          icon={<GalleryHorizontalEnd />}
+          title="Pictures that change over time, in the top area"
+          onClick={() => slideshowRef.current?.click()}
+        >
+          Slideshow
+        </Button>
+        <Button
+          size="sm"
+          fullWidth
+          className="mt-2"
+          icon={<Timer />}
+          title="Add a picture that shows between two times you type"
+          onClick={() => setTimerOpen(true)}
+        >
+          Image with timer
+        </Button>
+        {timerOpen && <TimedImageDialog onClose={() => setTimerOpen(false)} />}
+        <HiddenFileInput ref={slideshowRef} accept="image/*" multiple onFiles={addSlideshow} />
         <HiddenFileInput
           ref={inputRef}
           accept="image/*"

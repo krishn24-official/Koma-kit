@@ -59,6 +59,11 @@ export interface CellMedia {
   delay: number;
   /** True to leave this video's sound out of the preview and the export. */
   muted: boolean;
+  /**
+   * Videos only: repeat the (trimmed) clip until the next item in the box or the end of
+   * the timeline, instead of holding its last frame. On by default for GIFs.
+   */
+  loop?: boolean;
   /** Part of the picture/frame used, as fractions of it (x, y, w, h). Full = 0, 0, 1, 1. */
   crop: CellRect;
   /** Part of the source that plays, in seconds into the file. Videos only (0 for images). */
@@ -125,6 +130,33 @@ interface ElementBase {
   hidden: boolean;
   /** Locked elements can't be tapped or dragged on the canvas (select them in the list). */
   locked: boolean;
+  /** When it shows on the timeline, and how it comes and goes. Missing = always shown. */
+  timing?: ElementTiming;
+}
+
+/** How an element appears or disappears. */
+export type ElementTransition =
+  | 'none'
+  | 'fade'
+  | 'slide-up'
+  | 'slide-down'
+  | 'slide-left'
+  | 'slide-right'
+  | 'zoom'
+  | 'pop'
+  | 'blur';
+
+export interface ElementTiming {
+  /** Seconds on the timeline when it appears. */
+  from: number;
+  /** Seconds when it disappears, or null to stay until the end. */
+  until: number | null;
+  enter: ElementTransition;
+  exit: ElementTransition;
+  /** Seconds each transition takes. */
+  duration: number;
+  /** Slowly zooms in while shown (keeps still pictures alive). */
+  slowZoom: boolean;
 }
 
 export interface TextElement extends ElementBase {
@@ -160,8 +192,13 @@ export interface StickerElement extends ElementBase {
   slotAspect: number;
   /** Mirrored left ↔ right. */
   flipX: boolean;
-  /** Outline the picture is cut to (logos); 'none' shows the whole crop. */
+  /** Outline the picture is cut to (logos, frames); 'none' shows the whole crop. */
   shape: StickerShape;
+  /** Corners of a 'custom' shape, as fractions of the element's box. */
+  points: Array<[number, number]> | null;
+  /** For a piece taken out of a picture: where it came from (to remove the original). */
+  cutFrom?: CutSource;
+  border: PictureBorder;
   /** How far each edge fades out to transparent, as a share of the picture (0 = none). */
   fade: StickerFade;
   /** Soft colored light around the picture's outline. */
@@ -174,13 +211,37 @@ export interface StickerElement extends ElementBase {
 
 /** Blending effects shared by pictures on the canvas and grid boxes. */
 export interface PictureEffects {
+  border: PictureBorder;
   fade: StickerFade;
   glow: StickerGlow;
   shadow: StickerShadow;
   adjust: StickerAdjust;
 }
 
-export type StickerShape = 'none' | 'square' | 'rounded' | 'circle' | 'hexagon' | 'diamond';
+export type StickerShape =
+  | 'none'
+  | 'square'
+  | 'rounded'
+  | 'circle'
+  | 'hexagon'
+  | 'diamond'
+  | 'triangle'
+  | 'pentagon'
+  | 'star'
+  | 'heart'
+  /** Drawn by the user: see `points`. */
+  | 'custom';
+
+/** The picture a cut-out piece was taken from: one on the canvas, or one in a box. */
+export type CutSource =
+  { kind: 'element'; id: string } | { kind: 'cell'; index: number; itemId: string };
+
+/** Outline drawn just inside a picture's or box's edge (follows its shape). */
+export interface PictureBorder {
+  /** Design units (0 = none). */
+  width: number;
+  color: string;
+}
 
 export interface StickerFade {
   top: number;
