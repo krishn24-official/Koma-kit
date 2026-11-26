@@ -1,6 +1,7 @@
 import type {
   BadgeElement,
   BoxFade,
+  PictureBorder,
   PictureEffects,
   StickerAdjust,
   StickerFade,
@@ -39,9 +40,11 @@ export const NO_FADE: StickerFade = { top: 0, bottom: 0, left: 0, right: 0 };
 export const DEFAULT_GLOW: StickerGlow = { color: '#a855f7', strength: 0, size: 40 };
 export const DEFAULT_SHADOW: StickerShadow = { strength: 0, blur: 30, distance: 12 };
 export const NO_ADJUST: StickerAdjust = { brightness: 1, contrast: 1, saturation: 1 };
+export const NO_BORDER: PictureBorder = { width: 0, color: '#ffffff' };
 
 /** Fresh effects with everything off. */
 export const createEffects = (): PictureEffects => ({
+  border: { ...NO_BORDER },
   fade: { ...NO_FADE },
   glow: { ...DEFAULT_GLOW },
   shadow: { ...DEFAULT_SHADOW },
@@ -77,6 +80,8 @@ export const createSticker = (patch: Partial<StickerElement> = {}): StickerEleme
   slotAspect: PLACEHOLDER_ASPECT,
   flipX: false,
   shape: 'none',
+  points: null,
+  border: { ...NO_BORDER },
   fade: { ...NO_FADE },
   glow: { ...DEFAULT_GLOW },
   shadow: { ...DEFAULT_SHADOW },

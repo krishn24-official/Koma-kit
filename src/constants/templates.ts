@@ -1,10 +1,11 @@
-import { Newspaper, Users, type LucideIcon } from 'lucide-react';
+import { Circle, Hexagon, Images, Newspaper, Users, type LucideIcon } from 'lucide-react';
 import type { TemplateDesign } from '@/store/useEditorStore';
 import { DEFAULT_CANVAS_SIZE } from './canvasSizes';
 import { DEFAULT_STYLE } from './editor';
 import { createBadge, createSticker, createText } from './elements';
 import { getPreset } from './layouts';
 import { newCharacterSlot } from '@/utils/characterSlots';
+import { createFrame } from '@/utils/stickerShape';
 
 export interface StarterTemplate {
   id: string;
@@ -96,6 +97,96 @@ const collagePoster = (): TemplateDesign => {
   };
 };
 
+/** A frame-collage design: the box holds the background picture, frames sit on top. */
+const frameCollage = (
+  backgroundColor: string,
+  elements: TemplateDesign['elements'],
+): TemplateDesign => ({
+  canvasSize: DEFAULT_CANVAS_SIZE,
+  layoutRoot: getPreset('single').root,
+  presetId: 'single',
+  style: { ...DEFAULT_STYLE, gap: 0, padding: 0, radius: 0, backgroundColor },
+  elements,
+});
+
+/**
+ * Honeycomb: 4 columns of flat-topped hexagons, every other column shifted half a
+ * hexagon down, with white borders. Positions are worked out on the 1080 × 1350 canvas.
+ */
+const honeycomb = (): TemplateDesign => {
+  const W = 300; // hexagon width (design units)
+  const H = (W * Math.sqrt(3)) / 2;
+  const stepX = W * 0.75 * 1.06; // a little space between hexagons
+  const stepY = H * 1.06;
+  const cols = 4;
+  const rows = 4;
+  const clusterW = W + (cols - 1) * stepX;
+  const clusterH = H + (rows - 1) * stepY + stepY / 2;
+  const left = (1080 - clusterW) / 2 + W / 2;
+  const top = (1350 - clusterH) / 2 + H / 2;
+  const frames = [];
+  for (let c = 0; c < cols; c++) {
+    for (let r = 0; r < rows; r++) {
+      frames.push(
+        createFrame({
+          shape: 'hexagon',
+          width: W,
+          x: (left + c * stepX) / 1080,
+          y: (top + r * stepY + (c % 2 ? stepY / 2 : 0)) / 1350,
+          border: { width: 7, color: '#ffffff' },
+          shadow: { strength: 0.45, blur: 24, distance: 6 },
+        }),
+      );
+    }
+  }
+  return frameCollage('#1b2333', frames);
+};
+
+/** Bubbles: overlapping circles of different sizes; the bigger ones in front. */
+const bubbles = (): TemplateDesign => {
+  const spots: Array<[number, number, number]> = [
+    [0.8, 0.12, 250],
+    [0.22, 0.86, 260],
+    [0.62, 0.86, 300],
+    [0.74, 0.42, 340],
+    [0.5, 0.2, 300],
+    [0.24, 0.2, 380],
+    [0.3, 0.55, 460],
+  ];
+  return frameCollage(
+    '#2b5fb8',
+    spots.map(([x, y, width]) =>
+      createFrame({ shape: 'circle', x, y, width, border: { width: 10, color: '#ffffff' } }),
+    ),
+  );
+};
+
+/** Polaroid scatter: tilted photos with thick white borders on a light background. */
+const polaroids = (): TemplateDesign => {
+  const spots: Array<[number, number, number]> = [
+    [0.27, 0.22, -7],
+    [0.72, 0.25, 6],
+    [0.3, 0.55, 4],
+    [0.7, 0.6, -5],
+    [0.48, 0.83, 3],
+  ];
+  return frameCollage(
+    '#f3efe7',
+    spots.map(([x, y, rotation]) =>
+      createFrame({
+        shape: 'square',
+        slotAspect: 0.82,
+        x,
+        y,
+        rotation,
+        width: 400,
+        border: { width: 18, color: '#ffffff' },
+        shadow: { strength: 0.35, blur: 30, distance: 10 },
+      }),
+    ),
+  );
+};
+
 export const STARTER_TEMPLATES: StarterTemplate[] = [
   {
     id: 'news-banner',
@@ -114,5 +205,32 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
     icon: Users,
     hint: 'Tap the box for the background and the dashed slots for characters',
     build: collagePoster,
+  },
+  {
+    id: 'honeycomb',
+    name: 'Honeycomb',
+    description: 'Hexagon frames in a honeycomb with white borders.',
+    size: '4:5',
+    icon: Hexagon,
+    hint: 'Tap a hexagon to add a picture, and the background for the art behind',
+    build: honeycomb,
+  },
+  {
+    id: 'bubbles',
+    name: 'Bubbles',
+    description: 'Overlapping round frames of different sizes.',
+    size: '4:5',
+    icon: Circle,
+    hint: 'Tap a circle to add a picture',
+    build: bubbles,
+  },
+  {
+    id: 'polaroids',
+    name: 'Polaroid scatter',
+    description: 'Tilted photos with thick white borders.',
+    size: '4:5',
+    icon: Images,
+    hint: 'Tap a photo frame to add a picture',
+    build: polaroids,
   },
 ];

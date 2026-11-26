@@ -1,4 +1,4 @@
-import { Film, Image } from 'lucide-react';
+import { Film, Image, Type } from 'lucide-react';
 import { useCurrentLayout } from '@/store/selectors';
 import { useEditorStore } from '@/store/useEditorStore';
 import { usePlaybackStore } from '@/store/usePlaybackStore';
@@ -20,6 +20,13 @@ export function TimelineTracks({ duration }: { duration: number }) {
   const cellCount = useCurrentLayout().cells.length;
   const currentTime = usePlaybackStore((s) => s.currentTime);
   const seek = usePlaybackStore((s) => s.seek);
+
+  const elements = useEditorStore((s) => s.elements);
+  const selectedElement = useEditorStore((s) =>
+    s.selection?.kind === 'element' ? s.selection.id : null,
+  );
+  // Pictures / text shown at certain times, one row each.
+  const timed = elements.filter((el) => el.timing && !el.hidden);
 
   const rows = Array.from({ length: cellCount }, (_, index) => ({
     index,
@@ -74,6 +81,49 @@ export function TimelineTracks({ duration }: { duration: number }) {
           </div>
         </div>
       ))}
+      {timed.map((el, i) => {
+        const timing = el.timing!;
+        const until = Math.min(timing.until ?? duration, duration);
+        const Icon = el.type === 'sticker' ? Image : Type;
+        const name =
+          el.type === 'sticker'
+            ? (el.file?.name ?? el.label)
+            : el.text.split(String.fromCharCode(10))[0] || 'Text';
+        return (
+          <div key={el.id} className="flex items-center gap-2">
+            <span className="w-4 shrink-0 text-right text-[10px] text-amber-300/80 tabular-nums">
+              {String.fromCharCode(65 + (i % 26))}
+            </span>
+            <div
+              className={cn(
+                'relative h-6 flex-1 rounded bg-neutral-800/60',
+                selectedElement === el.id && 'ring-1 ring-brand-500/70',
+              )}
+            >
+              <button
+                type="button"
+                title={`${name} · ${formatTime(timing.from)}–${timing.until === null ? 'end' : formatTime(timing.until)}`}
+                onClick={() => {
+                  seek(timing.from);
+                  select({ kind: 'element', id: el.id });
+                }}
+                className="absolute inset-y-0.5 flex items-center gap-1 overflow-hidden rounded-sm border-l-2 border-amber-300 bg-amber-500/25 px-1 text-[10px] whitespace-nowrap text-amber-100"
+                style={{
+                  left: pct(Math.min(1, timing.from / duration)),
+                  width: pct(Math.max(0, until - timing.from) / duration),
+                }}
+              >
+                <Icon className="size-3 shrink-0" aria-hidden />
+                <span className="truncate">{name}</span>
+              </button>
+              <div
+                className="pointer-events-none absolute -inset-y-0.5 w-0.5 bg-white"
+                style={{ left: pct(Math.min(1, currentTime / duration)) }}
+              />
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

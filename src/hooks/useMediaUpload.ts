@@ -7,6 +7,9 @@ import { isMediaFile, readMediaFile } from '@/utils/media';
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 /** Upload helpers that read image/video files, update the store and report problems. */
+/** Animated GIFs take a moment to turn into clips. */
+const isGif = (file: File) => file.type === 'image/gif' || /\.gif$/i.test(file.name);
+
 export function useMediaUpload() {
   const setCellMedia = useEditorStore((s) => s.setCellMedia);
   const replaceItem = useEditorStore((s) => s.replaceItem);
@@ -22,6 +25,7 @@ export function useMediaUpload() {
         showToast('Please choose an image or video file', 'error');
         return null;
       }
+      if (isGif(file)) showToast('Preparing GIF…', 'info');
       try {
         return await readMediaFile(file);
       } catch {
@@ -41,6 +45,7 @@ export function useMediaUpload() {
         return;
       }
 
+      if (mediaFiles.some(isGif)) showToast('Preparing GIF…', 'info');
       const results = await Promise.allSettled(mediaFiles.map(readMediaFile));
       const loaded = results.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
       const failed = results.length - loaded.length;

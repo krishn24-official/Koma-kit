@@ -47,44 +47,136 @@ export function span(node: LayoutNode, direction: SplitDirection): number {
 
 // ─── Geometry ────────────────────────────────────────────────────────────────
 
+type Point = [number, number];
+
+/** A split's tilt per boundary (0 where missing). */
+export const tiltsOf = (node: Split): number[] =>
+  node.children.slice(1).map((_, i) => node.tilts?.[i] ?? 0);
+
+const isTilted = (t: number) => Math.abs(t) > 1e-6;
+
+/** True if any divider in the tree is slanted. */
+export const hasTilts = (node: LayoutNode): boolean =>
+  node.type === 'split' && (tiltsOf(node).some(isTilted) || node.children.some(hasTilts));
+
+/** Start and end of divider `i` of a split over `area` (fractions of the inner canvas). */
+function dividerLine(node: Split, area: CellRect, offset: number, tilt: number): [Point, Point] {
+  if (node.direction === 'horizontal') {
+    const p = area.x + offset * area.w;
+    return [
+      [p - (tilt / 2) * area.w, area.y],
+      [p + (tilt / 2) * area.w, area.y + area.h],
+    ];
+  }
+  const p = area.y + offset * area.h;
+  return [
+    [area.x, p - (tilt / 2) * area.h],
+    [area.x + area.w, p + (tilt / 2) * area.h],
+  ];
+}
+
+const cross = (a: Point, b: Point, p: Point) =>
+  (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]);
+
+/** Keeps the part of `poly` on one side of the line a→b (side = sign of the cross product). */
+function clipPolygon(poly: Point[], a: Point, b: Point, side: 1 | -1): Point[] {
+  const out: Point[] = [];
+  for (let i = 0; i < poly.length; i++) {
+    const p = poly[i]!;
+    const q = poly[(i + 1) % poly.length]!;
+    const dp = cross(a, b, p) * side;
+    const dq = cross(a, b, q) * side;
+    if (dp >= 0) out.push(p);
+    if (dp >= 0 !== dq >= 0) {
+      const t = dp / (dp - dq);
+      out.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]);
+    }
+  }
+  return out;
+}
+
+const boundsOf = (poly: Point[]): CellRect => {
+  const xs = poly.map(([x]) => x);
+  const ys = poly.map(([, y]) => y);
+  const x = Math.min(...xs);
+  const y = Math.min(...ys);
+  return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
+};
+
 function walk(
   node: LayoutNode,
   area: CellRect,
+  poly: Point[],
   path: number[],
-  visit: (node: LayoutNode, area: CellRect, path: number[]) => void,
+  visit: (node: LayoutNode, area: CellRect, path: number[], poly: Point[]) => void,
 ): void {
-  visit(node, area, path);
+  visit(node, area, path, poly);
   if (node.type === 'cell') return;
 
+  const tilts = tiltsOf(node);
+  const slanted = tilts.some(isTilted);
+  // Lines between children: straight dividers give the usual rectangles.
   let offset = 0;
+  const lines = node.children.slice(1).map((_, i) => {
+    offset += node.sizes[i] ?? 0;
+    return dividerLine(node, area, offset, tilts[i] ?? 0);
+  });
+
+  offset = 0;
   node.children.forEach((child, i) => {
     const size = node.sizes[i] ?? 0;
-    const childArea =
-      node.direction === 'horizontal'
+    // Child i lies after line i-1 and before line i.
+    let childPoly = poly;
+    const before = lines[i - 1];
+    const after = lines[i];
+    const horizontal = node.direction === 'horizontal';
+    if (before) childPoly = clipPolygon(childPoly, before[0], before[1], horizontal ? -1 : 1);
+    if (after) childPoly = clipPolygon(childPoly, after[0], after[1], horizontal ? 1 : -1);
+    const childArea = slanted
+      ? boundsOf(childPoly)
+      : horizontal
         ? { x: area.x + offset * area.w, y: area.y, w: size * area.w, h: area.h }
         : { x: area.x, y: area.y + offset * area.h, w: area.w, h: size * area.h };
-    walk(child, childArea, [...path, i], visit);
+    walk(child, childArea, childPoly, [...path, i], visit);
     offset += size;
   });
 }
 
 const FULL: CellRect = { x: 0, y: 0, w: 1, h: 1 };
+const FULL_POLY: Point[] = [
+  [0, 0],
+  [1, 0],
+  [1, 1],
+  [0, 1],
+];
 const resolvedCache = new WeakMap<LayoutNode, ResolvedLayout>();
 
+/** True if the polygon is just its bounding rectangle (no slanted edge). */
+const isRectangle = (poly: Point[], box: CellRect) =>
+  poly.every(
+    ([x, y]) =>
+      (Math.abs(x - box.x) < 1e-6 || Math.abs(x - box.x - box.w) < 1e-6) &&
+      (Math.abs(y - box.y) < 1e-6 || Math.abs(y - box.y - box.h) < 1e-6),
+  );
+
 /**
- * Flattens a tree into per-cell rectangles (indexed by cell number).
- * Cached per tree object, so the same tree always returns the same result and
- * React selectors stay stable.
+ * Flattens a tree into per-cell rectangles and (for slanted dividers) outlines, indexed
+ * by cell number. Cached per tree object, so the same tree always returns the same
+ * result and React selectors stay stable.
  */
 export function resolveLayout(root: LayoutNode): ResolvedLayout {
   const cached = resolvedCache.get(root);
   if (cached) return cached;
 
   const cells: CellRect[] = [];
-  walk(root, FULL, [], (node, area) => {
-    if (node.type === 'cell') cells[node.cell] = area;
+  const polygons: ResolvedLayout['polygons'] = [];
+  const tilted = hasTilts(root);
+  walk(root, FULL, FULL_POLY, [], (node, area, _path, poly) => {
+    if (node.type !== 'cell') return;
+    cells[node.cell] = area;
+    polygons[node.cell] = tilted && !isRectangle(poly, area) ? poly : null;
   });
-  const resolved = { cells };
+  const resolved = { cells, polygons };
   resolvedCache.set(root, resolved);
   return resolved;
 }
@@ -92,8 +184,9 @@ export function resolveLayout(root: LayoutNode): ResolvedLayout {
 /** Every draggable divider in the layout. */
 export function getDividers(root: LayoutNode): LayoutDivider[] {
   const dividers: LayoutDivider[] = [];
-  walk(root, FULL, [], (node, area, path) => {
+  walk(root, FULL, FULL_POLY, [], (node, area, path) => {
     if (node.type === 'cell') return;
+    const tilts = tiltsOf(node);
     let offset = 0;
     for (let i = 0; i < node.children.length - 1; i++) {
       offset += node.sizes[i] ?? 0;
@@ -104,10 +197,72 @@ export function getDividers(root: LayoutNode): LayoutDivider[] {
         area,
         position:
           node.direction === 'horizontal' ? area.x + offset * area.w : area.y + offset * area.h,
+        tilt: tilts[i] ?? 0,
       });
     }
   });
   return dividers;
+}
+
+/** Smallest gap kept between neighbouring dividers' ends (fraction of the split). */
+const MIN_END_GAP = 0.04;
+/** Steepest slant allowed. */
+export const MAX_TILT = 0.9;
+
+/**
+ * Keeps every divider of a split from crossing its neighbours at either end (and from
+ * the outer edges), by limiting the tilts. Returns the split with clamped tilts.
+ */
+function clampTilts(node: Split): Split {
+  if (!node.tilts) return node;
+  const tilts = tiltsOf(node);
+  const positions: number[] = [];
+  let offset = 0;
+  for (let i = 0; i < tilts.length; i++) {
+    offset += node.sizes[i] ?? 0;
+    positions.push(offset);
+  }
+  const start = (i: number) => (i < 0 ? 0 : i >= tilts.length ? 1 : positions[i]! - tilts[i]! / 2);
+  const end = (i: number) => (i < 0 ? 0 : i >= tilts.length ? 1 : positions[i]! + tilts[i]! / 2);
+  for (let i = 0; i < tilts.length; i++) {
+    const p = positions[i]!;
+    const lo = Math.max(
+      -MAX_TILT,
+      2 * (p - (start(i + 1) - MIN_END_GAP)),
+      2 * (end(i - 1) + MIN_END_GAP - p),
+    );
+    const hi = Math.min(
+      MAX_TILT,
+      2 * (p - (start(i - 1) + MIN_END_GAP)),
+      2 * (end(i + 1) - MIN_END_GAP - p),
+    );
+    tilts[i] = lo > hi ? 0 : clamp(tilts[i]!, lo, hi);
+  }
+  return { ...node, tilts };
+}
+
+/** Sets how slanted one divider is (clamped so it never crosses its neighbours). */
+export function setDividerTilt(
+  root: LayoutNode,
+  path: number[],
+  boundary: number,
+  tilt: number,
+): LayoutNode {
+  return updateAt(root, path, (node) => {
+    if (node.type === 'cell') return node;
+    const tilts = tiltsOf(node);
+    if (boundary < 0 || boundary >= tilts.length) return node;
+    tilts[boundary] = tilt;
+    return clampTilts({ ...node, tilts });
+  });
+}
+
+/** Straightens every divider. */
+export function straightenLayout(node: LayoutNode): LayoutNode {
+  if (node.type === 'cell') return node;
+  const straight: Split = { ...node, children: node.children.map(straightenLayout) };
+  delete straight.tilts;
+  return straight;
 }
 
 // ─── Editing ─────────────────────────────────────────────────────────────────
@@ -145,7 +300,7 @@ export function resizeDivider(
     const sizes = [...node.sizes];
     sizes[boundary] = nextA;
     sizes[boundary + 1] = total - nextA;
-    return { ...node, sizes };
+    return clampTilts({ ...node, sizes });
   });
 }
 
@@ -162,11 +317,12 @@ export function addStrip(root: LayoutNode, direction: SplitDirection): LayoutNod
   const keep = existingSpan / (existingSpan + 1);
 
   if (root.type === 'split' && root.direction === direction) {
-    return split(
+    const grown = split(
       direction,
       [...root.children, newStrip],
       [...root.sizes.map((size) => size * keep), 1 - keep],
-    );
+    ) as Split;
+    return root.tilts ? clampTilts({ ...grown, tilts: [...tiltsOf(root), 0] }) : grown;
   }
   return split(direction, [root, newStrip], [keep, 1 - keep]);
 }
@@ -206,7 +362,10 @@ function normalize(node: LayoutNode): LayoutNode {
   });
 
   if (children.length === 1) return children[0]!;
-  return { ...node, children, sizes };
+  const merged = children.length !== node.children.length;
+  const result = { ...node, children, sizes };
+  if (merged) delete result.tilts;
+  return result;
 }
 
 /**
@@ -232,7 +391,10 @@ export function removeCell(root: LayoutNode, index: number): LayoutNode | null {
     });
     if (children.length === 0) return null;
     const total = sizes.reduce((a, b) => a + b, 0) || 1;
-    return { ...node, children, sizes: sizes.map((size) => size / total) };
+    const lostChild = children.length !== node.children.length;
+    const kept = { ...node, children, sizes: sizes.map((size) => size / total) };
+    if (lostChild) delete kept.tilts;
+    return kept;
   };
 
   const next = remove(root);
@@ -244,11 +406,11 @@ export function equalizeLayout(node: LayoutNode): LayoutNode {
   if (node.type === 'cell') return node;
   const spans = node.children.map((child) => span(child, node.direction));
   const total = spans.reduce((a, b) => a + b, 0);
-  return {
+  return clampTilts({
     ...node,
     children: node.children.map(equalizeLayout),
     sizes: spans.map((s) => s / total),
-  };
+  });
 }
 
 export const isSplit = (node: LayoutNode): node is Split => node.type === 'split';

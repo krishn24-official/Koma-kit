@@ -5,31 +5,41 @@ import {
   Check,
   Crop as CropIcon,
   Expand,
+  ImageMinus,
   ImagePlus,
   ListVideo,
+  LogIn,
+  LogOut,
   MapPin,
+  PenTool,
   Play,
   Plus,
   RefreshCw,
+  Repeat,
   Scan,
   Scissors,
   Shrink,
+  SquarePlus,
   Trash2,
   Undo2,
   Volume2,
   VolumeX,
   ZoomIn,
+  X,
   ZoomOut,
 } from 'lucide-react';
-import { useRef, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/Button';
 import { AddLogoButton } from './AddLogoButton';
+import { TrimEditor } from './TrimEditor';
 import { HiddenFileInput } from '@/components/ui/HiddenFileInput';
 import { IconButton } from '@/components/ui/IconButton';
 import { Slider } from '@/components/ui/Slider';
 import { DEFAULT_TRANSFORM } from '@/constants/editor';
 import { useCrop } from '@/hooks/useCrop';
 import { useFitToPictures } from '@/hooks/useFitToPictures';
+import { undoLastDraw, useCanUndoDraw, useFrameDraw } from '@/hooks/useFrameDraw';
+import { isPiece, useCutoutActions } from '@/hooks/useCutoutActions';
 import { useMediaCrop } from '@/hooks/useMediaCrop';
 import { useStickerCrop } from '@/hooks/useStickerCrop';
 import { useMediaUpload } from '@/hooks/useMediaUpload';
@@ -70,6 +80,29 @@ function PasteButton({
   );
 }
 
+/**
+ * Times the selected element from the playhead: "from" makes it appear here (and show
+ * for 3 s if it had no timing), "until" makes it disappear here.
+ */
+function setElementTime(id: string, which: 'from' | 'until') {
+  const store = useEditorStore.getState();
+  const el = store.elements.find((e) => e.id === id);
+  if (!el) return;
+  const now = usePlaybackStore.getState().currentTime;
+  const timing = el.timing ?? { ...DEFAULT_TIMING, from: 0, until: null };
+  if (which === 'from') {
+    const until =
+      !el.timing || (timing.until !== null && timing.until <= now + 0.2) ? now + 3 : timing.until;
+    store.updateElement(id, { timing: { ...timing, from: now, until } });
+  } else {
+    if (now <= timing.from + 0.2) {
+      useUiStore.getState().showToast('Move the playhead after where it appears', 'info');
+      return;
+    }
+    store.updateElement(id, { timing: { ...timing, until: now } });
+  }
+}
+
 /** Zooms a logo/picture inside its frame (see zoomSticker). */
 function zoomSelectedSticker(id: string, factor: number) {
   const store = useEditorStore.getState();
@@ -85,7 +118,8 @@ import {
 import { hasBars } from '@/utils/detectBars';
 import { clamp } from '@/utils/math';
 import { zoomSticker } from '@/utils/stickerShape';
-import { formatTime, getPlayLength, getPlayStart, isVideoRunning } from '@/utils/timeline';
+import { DEFAULT_TIMING } from '@/utils/elementTiming';
+import { formatTime, getPlayLength, getPlayStart } from '@/utils/timeline';
 
 const ZOOM_STEP = 1.1;
 
@@ -107,6 +141,7 @@ function MediaControls({ index, item, cellRect }: MediaControlsProps) {
   const setItemMuted = useEditorStore((s) => s.setItemMuted);
   const { replaceInCell } = useMediaUpload();
   const { start: startMediaCrop } = useMediaCrop();
+  const { start: startDraw } = useFrameDraw();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const mediaSize = getImageSize(item);
@@ -176,6 +211,13 @@ function MediaControls({ index, item, cellRect }: MediaControlsProps) {
           onClick={() => inputRef.current?.click()}
         />
         <PasteButton target={{ kind: 'cell', index }} label="Paste to replace" />
+        {item.kind === 'image' && (
+          <IconButton
+            label="Cut out (draw around the part to keep)"
+            icon={<PenTool />}
+            onClick={() => startDraw({ kind: 'cell', index, itemId: item.id })}
+          />
+        )}
         <IconButton
           label="Swap with another cell"
           icon={<ArrowLeftRight />}
@@ -265,55 +307,58 @@ function TimingControls({ index, item }: { index: number; item: CellMedia | null
 }
 
 /** Cut a video at the playhead: drop everything after (end) or before (start) it. */
-function TrimControls({ index, item }: { index: number; item: CellMedia }) {
-  const currentTime = usePlaybackStore((s) => s.currentTime);
-  const seek = usePlaybackStore((s) => s.seek);
+/**
+ * A clip's play settings: Trim (opens the trim editor), Loop, and which part plays.
+ */
+function TrimControls({
+  index,
+  item,
+  editing,
+  setEditing,
+}: {
+  index: number;
+  item: CellMedia;
+  /** The trim editor is open (owned by CellControls, which hides other rows meanwhile). */
+  editing: boolean;
+  setEditing: (editing: boolean) => void;
+}) {
+  const tenth = (t: number) => formatTime(Math.round(t * 10) / 10 + 1e-6);
   const setItemTrim = useEditorStore((s) => s.setItemTrim);
-
-  const playStart = getPlayStart(item);
-  const fileTime = item.trimStart + (currentTime - playStart);
-  const canCut = isVideoRunning(item, currentTime) && currentTime - playStart > 0.05;
+  const setItemLoop = useEditorStore((s) => s.setItemLoop);
   const isTrimmed = item.trimStart > 0.01 || item.trimEnd < item.duration - 0.01;
+
+  if (editing) return <TrimEditor index={index} item={item} onClose={() => setEditing(false)} />;
 
   return (
     <div className="flex flex-wrap items-center justify-center gap-2 border-t border-neutral-800 pt-2">
-      <Button
-        size="sm"
-        icon={<Scissors />}
-        disabled={!canCut}
-        title="Cut off the rest of the video after the playhead"
-        onClick={() => setItemTrim(index, item.id, { trimEnd: fileTime })}
-      >
-        Trim end here
+      <Button size="sm" icon={<Scissors />} onClick={() => setEditing(true)}>
+        Trim
       </Button>
       <Button
         size="sm"
-        variant="ghost"
-        icon={<Scissors className="-scale-x-100" />}
-        disabled={!canCut}
-        title="Cut off the part of the video before the playhead"
-        onClick={() => {
-          setItemTrim(index, item.id, { trimStart: fileTime });
-          seek(playStart);
-        }}
+        variant={item.loop ? 'primary' : 'ghost'}
+        icon={<Repeat />}
+        aria-pressed={Boolean(item.loop)}
+        title="Repeat the clip until the next item in this box or the end of the video"
+        onClick={() => setItemLoop(index, item.id, !item.loop)}
       >
-        Trim start here
+        Loop
       </Button>
+      <span className="text-xs text-neutral-400 tabular-nums">
+        {isTrimmed
+          ? `Plays ${tenth(item.trimStart)}–${tenth(item.trimEnd)} of ${tenth(item.duration)}`
+          : `Plays the whole clip (${tenth(item.duration)})`}
+        {item.loop ? ' · loops' : ''}
+      </span>
       {isTrimmed && (
-        <>
-          <span className="text-xs text-neutral-400 tabular-nums">
-            Plays {formatTime(item.trimStart)}–{formatTime(item.trimEnd)} of{' '}
-            {formatTime(item.duration)}
-          </span>
-          <Button
-            size="sm"
-            variant="ghost"
-            icon={<Undo2 />}
-            onClick={() => setItemTrim(index, item.id, { trimStart: 0, trimEnd: item.duration })}
-          >
-            Undo trim
-          </Button>
-        </>
+        <Button
+          size="sm"
+          variant="ghost"
+          icon={<Undo2 />}
+          onClick={() => setItemTrim(index, item.id, { trimStart: 0, trimEnd: item.duration })}
+        >
+          Undo trim
+        </Button>
       )}
     </div>
   );
@@ -385,6 +430,7 @@ function CellControls({ index }: { index: number }) {
   const item = useActiveItem(index);
   const cellRect = useDesignCellRects()[index];
   const hasTimeline = useTimelineDuration() > 0;
+  const [trimming, setTrimming] = useState(false);
 
   return (
     <div className="flex w-full max-w-3xl flex-col gap-2">
@@ -393,9 +439,12 @@ function CellControls({ index }: { index: number }) {
       ) : (
         <EmptyCellControls index={index} />
       )}
-      {item?.kind === 'video' && <TrimControls index={index} item={item} />}
-      {item?.kind === 'video' && <DelayControls index={index} item={item} />}
-      {hasTimeline && <TimingControls index={index} item={item} />}
+      {item?.kind === 'video' && (
+        <TrimControls index={index} item={item} editing={trimming} setEditing={setTrimming} />
+      )}
+      {/* While trimming, the other clip rows step aside (more room on phones). */}
+      {item?.kind === 'video' && !trimming && <DelayControls index={index} item={item} />}
+      {hasTimeline && !trimming && <TimingControls index={index} item={item} />}
     </div>
   );
 }
@@ -413,6 +462,8 @@ export function CellToolbar() {
   const stickerCrop = useStickerCrop();
   const mediaCrop = useMediaCrop();
   const mediaCropping = useUiStore((s) => s.mediaCrop !== null);
+  const frameDraw = useUiStore((s) => s.frameDraw);
+  const frameDrawing = useFrameDraw();
   const canRemoveBars = useUiStore((s) => Boolean(s.mediaCrop?.bars && hasBars(s.mediaCrop.bars)));
   const stickerCropping = useUiStore((s) => s.stickerCrop !== null);
   const selectedIsPicture = useEditorStore((s) => {
@@ -421,6 +472,15 @@ export function CellToolbar() {
     const el = s.elements.find((e) => e.id === sel.id);
     return el?.type === 'sticker' && Boolean(el.src);
   });
+  // A cut-out piece (for Remove original / Move to new box).
+  const selectedPiece = useEditorStore((s) => {
+    const sel = s.selection;
+    if (sel?.kind !== 'element') return null;
+    const el = s.elements.find((e) => e.id === sel.id);
+    return el?.type === 'sticker' && isPiece(el) ? el : null;
+  });
+  const cutout = useCutoutActions();
+  const canUndoDraw = useCanUndoDraw();
   const selectedIsSticker = useEditorStore((s) => {
     const sel = s.selection;
     return (
@@ -430,7 +490,40 @@ export function CellToolbar() {
 
   let content: ReactNode;
 
-  if (mediaCropping) {
+  if (frameDraw) {
+    content = (
+      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
+        <Hint>
+          {frameDraw.target
+            ? 'Draw around the part to keep: drag to trace, or tap corners, then Done'
+            : 'Draw on a picture to take that part out, or on empty space for a frame · drag to trace, or tap corners, then Done'}
+        </Hint>
+        <div className="flex flex-wrap justify-center gap-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={<Undo2 />}
+            disabled={frameDraw.history.length === 0}
+            onClick={frameDrawing.undo}
+          >
+            Undo
+          </Button>
+          <Button size="sm" icon={<X />} onClick={frameDrawing.cancel}>
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            variant="primary"
+            icon={<Check />}
+            disabled={frameDraw.points.length < 3}
+            onClick={frameDrawing.finish}
+          >
+            Done
+          </Button>
+        </div>
+      </div>
+    );
+  } else if (mediaCropping) {
     content = (
       <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
         <Hint>Drag the frame's edges or corners to cut the picture.</Hint>
@@ -503,6 +596,38 @@ export function CellToolbar() {
         <Hint>Drag to move. Drag a corner dot or pinch to resize.</Hint>
         {selectedIsSticker && (
           <PasteButton target={{ kind: 'sticker', id: selection.id }} label="Paste picture" />
+        )}
+        {selectedIsPicture && (
+          <IconButton
+            label="Cut out (draw around the part to keep)"
+            icon={<PenTool />}
+            onClick={() => frameDrawing.start({ kind: 'element', id: selection.id })}
+          />
+        )}
+        <IconButton
+          label="Appear here (from the playhead)"
+          icon={<LogIn />}
+          onClick={() => setElementTime(selection.id, 'from')}
+        />
+        <IconButton
+          label="Disappear here (at the playhead)"
+          icon={<LogOut />}
+          onClick={() => setElementTime(selection.id, 'until')}
+        />
+        {canUndoDraw && <IconButton label="Undo cut" icon={<Undo2 />} onClick={undoLastDraw} />}
+        {selectedPiece?.cutFrom && (
+          <IconButton
+            label="Remove original picture"
+            icon={<ImageMinus />}
+            onClick={() => cutout.removeOriginal(selectedPiece)}
+          />
+        )}
+        {selectedPiece && (
+          <IconButton
+            label="Move to new box"
+            icon={<SquarePlus />}
+            onClick={() => void cutout.moveToNewBox(selectedPiece)}
+          />
         )}
         {selectedIsPicture && (
           <>

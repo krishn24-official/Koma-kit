@@ -19,11 +19,12 @@ export function useKeyboardShortcuts() {
 
       // While cropping (canvas or a logo), only Escape (cancel) does anything.
       const ui = useUiStore.getState();
-      if (ui.cropRect || ui.stickerCrop || ui.mediaCrop) {
+      if (ui.cropRect || ui.stickerCrop || ui.mediaCrop || ui.frameDraw) {
         if (event.key === 'Escape') {
           ui.setCropRect(null);
           ui.setStickerCrop(null);
           ui.setMediaCrop(null);
+          ui.setFrameDraw(null);
         }
         return;
       }

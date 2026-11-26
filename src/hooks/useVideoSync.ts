@@ -19,13 +19,22 @@ const SEEK_TOLERANCE = 0.02;
 export function useVideoSync(ref: RefObject<HTMLVideoElement>, item: CellMedia) {
   // Only timing and mute matter here. Depending on the whole item would restart
   // playback on every pan/zoom change.
-  const { id, start, delay, trimStart, trimEnd, muted } = item;
+  const { id, start, delay, trimStart, trimEnd, muted, loop, duration } = item;
 
   useEffect(() => {
     const video = ref.current;
     if (!video) return;
     video.muted = muted;
-    const timing = { start, delay, trimStart, trimEnd };
+    const timing = { start, delay, trimStart, trimEnd, loop };
+    // An untrimmed looping clip can loop on its own (seamless). A trimmed one jumps back
+    // to the trim start as soon as it reaches the trim end.
+    video.loop = Boolean(loop) && trimStart < 0.01 && trimEnd > duration - 0.01;
+    const onTimeUpdate = () => {
+      if (loop && !video.loop && video.currentTime >= trimEnd - 0.06) {
+        video.currentTime = trimStart;
+      }
+    };
+    video.addEventListener('timeupdate', onTimeUpdate);
 
     const sync = ({ currentTime, isPlaying }: PlaybackState) => {
       const target = getVideoLocalTime(timing, currentTime);
@@ -33,9 +42,13 @@ export function useVideoSync(ref: RefObject<HTMLVideoElement>, item: CellMedia) 
       if (isPlaying && isVideoRunning(timing, currentTime)) {
         if (video.paused) {
           video.currentTime = target;
-          // Allowed with sound after the first tap on the page. If the browser still
-          // refuses, play muted rather than not at all.
-          video.play().catch(() => {
+          // Sound back on each time it starts (an earlier fallback may have muted it).
+          video.muted = muted;
+          video.play().catch((error: unknown) => {
+            // Only when the browser blocks sound (before the first tap on the page) play
+            // muted rather than not at all. Other failures, like a play interrupted by a
+            // pause or a jump, are not about sound: leave the sound on.
+            if (!(error instanceof DOMException && error.name === 'NotAllowedError')) return;
             video.muted = true;
             video.play().catch(() => undefined);
           });
@@ -56,14 +69,15 @@ export function useVideoSync(ref: RefObject<HTMLVideoElement>, item: CellMedia) 
       audible: !muted,
       read: () =>
         !video.paused && !video.ended && video.readyState >= 2
-          ? getTimelineTimeOf(timing, video.currentTime)
+          ? getTimelineTimeOf(timing, video.currentTime, usePlaybackStore.getState().currentTime)
           : null,
     });
 
     return () => {
       unsubscribe();
       unregister();
+      video.removeEventListener('timeupdate', onTimeUpdate);
       video.pause();
     };
-  }, [ref, id, start, delay, trimStart, trimEnd, muted]);
+  }, [ref, id, start, delay, trimStart, trimEnd, muted, loop, duration]);
 }

@@ -10,6 +10,7 @@ import { DESIGN_WIDTH } from '@/constants/canvasSizes';
 import type { EditorState, TemplateDesign } from '@/store/useEditorStore';
 import type { CanvasElement, CellMedia, CanvasStyle } from '@/types';
 import { requestPersistence, runDb } from './db';
+import { createEffects, createSticker } from '@/constants/elements';
 import { canvasToBlob } from './download';
 import { createId } from './id';
 import { resolveLayout } from './layoutTree';
@@ -75,10 +76,20 @@ export function restoreDesign(design: TemplateDesign): TemplateDesign {
         }
       : style,
     elements: (design.elements ?? []).map((el) => {
-      const copy = { ...el, id: createId() };
+      // Designs saved by older versions miss newer fields: fill in the defaults.
+      const copy =
+        el.type === 'sticker'
+          ? { ...createSticker(), ...el, id: createId() }
+          : { ...el, hidden: el.hidden ?? false, locked: el.locked ?? false, id: createId() };
       if (copy.type === 'sticker' && copy.file) copy.src = url(copy.file);
       return copy;
     }),
+    boxEffects: Object.fromEntries(
+      Object.entries(design.boxEffects ?? {}).map(([key, e]) => [
+        key,
+        { ...createEffects(), ...e },
+      ]),
+    ),
     cells,
   };
 }

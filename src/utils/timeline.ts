@@ -1,5 +1,5 @@
 import { IMAGE_TAIL_SECONDS } from '@/constants/editor';
-import type { CellMedia } from '@/types';
+import type { CanvasElement, CellMedia } from '@/types';
 import { clamp } from './math';
 
 const EPSILON = 1e-6;
@@ -29,9 +29,20 @@ export function getActiveItem(
  * Total timeline length. It is 0 (no timeline) until the template has a video or an
  * image scheduled after the start.
  */
-export function getTimelineDuration(cells: Record<number, CellMedia[]>, cellCount: number): number {
+export function getTimelineDuration(
+  cells: Record<number, CellMedia[]>,
+  cellCount: number,
+  elements: readonly CanvasElement[] = [],
+): number {
   let duration = 0;
   let timed = false;
+
+  // Pictures/text shown at certain times also make a timeline.
+  for (const el of elements) {
+    if (!el.timing || el.hidden) continue;
+    timed = true;
+    duration = Math.max(duration, el.timing.until ?? el.timing.from + IMAGE_TAIL_SECONDS);
+  }
 
   for (let i = 0; i < cellCount; i++) {
     for (const item of cells[i] ?? []) {
@@ -48,7 +59,7 @@ export function getTimelineDuration(cells: Record<number, CellMedia[]>, cellCoun
   return timed ? duration : 0;
 }
 
-type Timing = Pick<CellMedia, 'start' | 'delay' | 'trimStart' | 'trimEnd'>;
+type Timing = Pick<CellMedia, 'start' | 'delay' | 'trimStart' | 'trimEnd' | 'loop'>;
 
 /** When a video actually starts playing (it shows its first frame from `start`). */
 export const getPlayStart = (item: Timing): number => item.start + item.delay;
@@ -58,19 +69,33 @@ export const getPlayLength = (item: Timing): number => Math.max(0, item.trimEnd 
 
 /**
  * Position in the video file (seconds) for a timeline time, respecting the trim.
- * It holds the last kept frame after the trimmed clip ends.
+ * It holds the last kept frame after the trimmed clip ends, or starts over if it loops.
  */
-export const getVideoLocalTime = (item: Timing, time: number): number =>
-  item.trimStart +
-  clamp(time - getPlayStart(item), 0, Math.max(0, getPlayLength(item) - END_MARGIN));
+export const getVideoLocalTime = (item: Timing, time: number): number => {
+  const length = getPlayLength(item);
+  const elapsed = time - getPlayStart(item);
+  if (item.loop && elapsed > 0 && length > END_MARGIN * 2) {
+    return item.trimStart + Math.min(elapsed % length, length - END_MARGIN);
+  }
+  return item.trimStart + clamp(elapsed, 0, Math.max(0, length - END_MARGIN));
+};
 
-/** Timeline time at which the video file is at `fileTime` (inverse of getVideoLocalTime). */
-export const getTimelineTimeOf = (item: Timing, fileTime: number): number =>
-  getPlayStart(item) + (fileTime - item.trimStart);
+/**
+ * Timeline time at which the video file is at `fileTime` (inverse of getVideoLocalTime).
+ * A looping clip is at that point once per repeat: the repeat closest to `near` (the
+ * current timeline time) is used.
+ */
+export const getTimelineTimeOf = (item: Timing, fileTime: number, near?: number): number => {
+  const first = getPlayStart(item) + (fileTime - item.trimStart);
+  const length = getPlayLength(item);
+  if (!item.loop || near === undefined || length <= 0) return first;
+  return first + Math.max(0, Math.round((near - first) / length)) * length;
+};
 
 /** True while a video should actually be playing (not before its start or after its end). */
 export const isVideoRunning = (item: Timing, time: number): boolean => {
   const local = time - getPlayStart(item);
+  if (item.loop) return local >= 0;
   return local >= 0 && local < getPlayLength(item) - END_MARGIN;
 };
 

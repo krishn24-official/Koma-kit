@@ -91,7 +91,20 @@ export async function loadVideoFrame(src: string, time: number): Promise<HTMLVid
  * Turns a local image or video file into cell media backed by an object URL.
  * Files never leave the browser.
  */
+/** GIFs are checked before reading (animated ones become clips). */
+const isGifFile = (file: File): boolean => file.type === 'image/gif' || /\.gif$/i.test(file.name);
+
 export async function readMediaFile(file: File): Promise<CellMedia> {
+  // Animated GIFs become short looping clips (the converter is loaded only when needed).
+  if (isGifFile(file)) {
+    const { gifToVideo } = await import('./gifToVideo');
+    const clip = await gifToVideo(file).catch(() => null);
+    if (clip) {
+      const media = await readMediaFile(clip);
+      return { ...media, fileName: file.name, loop: true, muted: true };
+    }
+  }
+
   const src = URL.createObjectURL(file);
   const base = {
     id: createId(),
@@ -101,6 +114,7 @@ export async function readMediaFile(file: File): Promise<CellMedia> {
     start: 0,
     delay: 0,
     muted: false,
+    loop: false,
     crop: { ...FULL_CROP },
     transform: { ...DEFAULT_TRANSFORM },
   };

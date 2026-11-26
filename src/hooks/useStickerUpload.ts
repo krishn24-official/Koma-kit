@@ -1,7 +1,14 @@
 import { useCallback } from 'react';
-import { DESIGN_WIDTH } from '@/constants/canvasSizes';
+import { DESIGN_WIDTH, toDesignSize } from '@/constants/canvasSizes';
+import { countCells } from '@/utils/layoutTree';
+import { getTimelineDuration } from '@/utils/timeline';
 import { createSticker, FULL_CROP } from '@/constants/elements';
 import { newCharacterSlot } from '@/utils/characterSlots';
+import { coverCrop, isFrame } from '@/utils/stickerShape';
+import { stickerHeight } from '@/utils/elements';
+
+/** Width / height of a sticker as shown. */
+const stickerAspect = (s: StickerElement) => s.width / stickerHeight(s);
 import { useEditorStore } from '@/store/useEditorStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { StickerElement } from '@/types';
@@ -51,7 +58,18 @@ export function useStickerUpload() {
       const picture = await readSticker(files[0], (message) => showToast(message, 'error'));
       if (!picture) return;
       const store = useEditorStore.getState();
-      if (id) store.updateElement(id, picture);
+      const current = id ? store.elements.find((e) => e.id === id) : undefined;
+      if (current?.type === 'sticker' && isFrame(current)) {
+        // Frames keep their size and shape: the picture fills them (centred).
+        store.updateElement(current.id, {
+          ...picture,
+          crop: coverCrop(
+            picture.naturalWidth,
+            picture.naturalHeight,
+            current.src ? stickerAspect(current) : current.slotAspect,
+          ),
+        });
+      } else if (id) store.updateElement(id, picture);
       else store.addElement(createSticker({ ...picture, label }));
     },
     [showToast],
@@ -85,6 +103,70 @@ export function useAddPictures() {
             y: 0.55,
           }),
         ),
+      );
+    },
+    [showToast],
+  );
+}
+
+/** Seconds per picture when there's no video to spread them over. */
+const SLIDE_SECONDS = 3;
+/** Crossfade length between slideshow pictures (seconds). */
+const SLIDE_FADE = 0.6;
+
+/**
+ * Returns `add(files)`: a quick slideshow. Every picture gets its own time slot, spread
+ * evenly over the video (or 3 s each without one), in the top area of the canvas so
+ * subtitles lower down stay visible. Neighbours crossfade and each slowly zooms.
+ */
+export function useSlideshow() {
+  const showToast = useUiStore((s) => s.showToast);
+
+  return useCallback(
+    async (files: File[]) => {
+      const pictures = (
+        await Promise.all(
+          files.map((file) => readSticker(file, (message) => showToast(message, 'error'))),
+        )
+      ).filter((p): p is StickerPicture => p !== null);
+      const n = pictures.length;
+      if (n === 0) return;
+
+      const store = useEditorStore.getState();
+      const design = toDesignSize(store.canvasSize);
+      const videoLength = getTimelineDuration(store.cells, countCells(store.layoutRoot));
+      const total = videoLength > 0 ? videoLength : n * SLIDE_SECONDS;
+      const slot = total / n;
+
+      store.addElements(
+        pictures.map((picture, i) => {
+          // Fit in the top area: at most 90% wide and half the height.
+          const aspect = picture.naturalWidth / Math.max(1, picture.naturalHeight);
+          const width = Math.min(design.width * 0.9, design.height * 0.5 * aspect);
+          const height = width / aspect;
+          return createSticker({
+            ...picture,
+            label: 'Picture',
+            width,
+            x: 0.5,
+            y: (design.height * 0.04 + height / 2) / design.height,
+            fade: { top: 0, bottom: 0.18, left: 0, right: 0 },
+            timing: {
+              from: i * slot,
+              // Each one stays a little longer than its slot, so the next fades in over it.
+              until: i === n - 1 ? null : (i + 1) * slot + SLIDE_FADE,
+              // The first one is there from the start; the others fade in over it.
+              enter: i === 0 ? 'none' : 'fade',
+              exit: 'fade',
+              duration: SLIDE_FADE,
+              slowZoom: true,
+            },
+          });
+        }),
+      );
+      showToast(
+        `Slideshow: ${n} ${n === 1 ? 'picture' : 'pictures'}, about ${slot.toFixed(1)} s each`,
+        'success',
       );
     },
     [showToast],

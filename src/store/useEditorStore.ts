@@ -15,6 +15,8 @@ import {
   equalizeLayout as equalizeTree,
   removeCell,
   resizeDivider as resizeTreeDivider,
+  setDividerTilt as setTreeDividerTilt,
+  straightenLayout as straightenTree,
   resolveLayout,
 } from '@/utils/layoutTree';
 import { cropCanvas as cropCanvasContent } from '@/utils/cropCanvas';
@@ -76,6 +78,10 @@ export interface EditorActions {
   /** Drags a divider: `delta` is a fraction of the split's length. */
   resizeDivider: (path: number[], boundary: number, delta: number) => void;
   equalizeLayout: () => void;
+  /** Slants a divider (0 = straight); limited so it never crosses its neighbours. */
+  setDividerTilt: (path: number[], boundary: number, tilt: number) => void;
+  /** Makes every divider straight again. */
+  straightenLayout: () => void;
   /**
    * Changes the canvas shape. Exact sizes (platforms, typed) also set the export to
    * that exact resolution.
@@ -111,6 +117,8 @@ export interface EditorActions {
   setItemCrop: (index: number, itemId: string, crop: CellRect) => void;
   /** Leaves a video's sound out (true) or puts it back (false). */
   setItemMuted: (index: number, itemId: string, muted: boolean) => void;
+  /** Repeats a video until the next item / the end (true), or plays it once (false). */
+  setItemLoop: (index: number, itemId: string, loop: boolean) => void;
 
   startSwap: (index: number) => void;
   cancelSwap: () => void;
@@ -294,6 +302,15 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
     })),
 
   equalizeLayout: () => set((s) => ({ layoutRoot: equalizeTree(s.layoutRoot), presetId: null })),
+
+  setDividerTilt: (path, boundary, tilt) =>
+    set((s) => ({
+      layoutRoot: setTreeDividerTilt(s.layoutRoot, path, boundary, tilt),
+      presetId: null,
+    })),
+
+  straightenLayout: () =>
+    set((s) => ({ layoutRoot: straightenTree(s.layoutRoot), presetId: null })),
 
   setCanvasSize: (canvasSize) =>
     set((s) => {
@@ -484,6 +501,21 @@ export const useEditorStore = create<EditorStore>()((set, get) => ({
           index,
           items.map((item) =>
             item.id === itemId ? { ...item, crop, transform: { ...DEFAULT_TRANSFORM } } : item,
+          ),
+        ),
+      };
+    }),
+
+  setItemLoop: (index, itemId, loop) =>
+    set((s) => {
+      const items = s.cells[index];
+      if (!items) return {};
+      return {
+        cells: withItems(
+          s.cells,
+          index,
+          items.map((item) =>
+            item.id === itemId && item.kind === 'video' ? { ...item, loop } : item,
           ),
         ),
       };

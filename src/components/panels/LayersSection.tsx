@@ -1,7 +1,10 @@
-import { Columns3, Equal, Plus, Rows3, SquareMinus } from 'lucide-react';
+import { Columns3, Equal, LayoutPanelLeft, Minus, Plus, Rows3, SquareMinus } from 'lucide-react';
+import { isPiece, useCutoutActions } from '@/hooks/useCutoutActions';
+import { hasTilts } from '@/utils/layoutTree';
 import { Button } from '@/components/ui/Button';
 import { PanelSection } from '@/components/ui/PanelSection';
 import { AddLogoButton } from '@/components/editor/AddLogoButton';
+import { FrameButtons } from '@/components/editor/FrameButtons';
 import { MAX_CELLS } from '@/constants/layouts';
 import { useCurrentLayout } from '@/store/selectors';
 import { useEditorStore } from '@/store/useEditorStore';
@@ -18,6 +21,12 @@ export function LayersSection() {
   const removeBox = useEditorStore((s) => s.removeBox);
   const equalizeLayout = useEditorStore((s) => s.equalizeLayout);
   const full = boxCount >= MAX_CELLS;
+  const tilted = useEditorStore((s) => hasTilts(s.layoutRoot));
+  const straighten = useEditorStore((s) => s.straightenLayout);
+  const pieceCount = useEditorStore(
+    (s) => s.elements.filter((e) => e.type === 'sticker' && isPiece(e)).length,
+  );
+  const { arrangeIntoBoxes } = useCutoutActions();
 
   return (
     <PanelSection
@@ -34,6 +43,7 @@ export function LayersSection() {
             {full ? `Max ${MAX_CELLS} boxes` : 'Add layer'}
           </Button>
           <AddLogoButton size="md" />
+          <FrameButtons size="md" />
         </div>
         <div className="grid grid-cols-2 gap-2">
           <Button size="sm" icon={<Rows3 />} disabled={full} onClick={addRow}>
@@ -43,6 +53,21 @@ export function LayersSection() {
             Add column
           </Button>
         </div>
+        {pieceCount > 0 && (
+          <Button
+            size="sm"
+            fullWidth
+            icon={<LayoutPanelLeft />}
+            onClick={() => void arrangeIntoBoxes()}
+          >
+            Put {pieceCount} cut-{pieceCount === 1 ? 'out' : 'outs'} into boxes
+          </Button>
+        )}
+        {tilted && (
+          <Button size="sm" variant="ghost" fullWidth icon={<Minus />} onClick={straighten}>
+            Straighten lines
+          </Button>
+        )}
         <Button
           size="sm"
           variant="danger"

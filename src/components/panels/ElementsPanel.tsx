@@ -1,5 +1,6 @@
 import {
   Eye,
+  GalleryHorizontalEnd,
   EyeOff,
   ImagePlus,
   Images,
@@ -15,10 +16,11 @@ import { Button } from '@/components/ui/Button';
 import { HiddenFileInput } from '@/components/ui/HiddenFileInput';
 import { PanelSection } from '@/components/ui/PanelSection';
 import { createBadge, createText } from '@/constants/elements';
+import { FrameButtons } from '@/components/editor/FrameButtons';
 import { IconButton } from '@/components/ui/IconButton';
 import { NumberStepper } from '@/components/ui/NumberStepper';
 import { toDesignSize } from '@/constants/canvasSizes';
-import { useAddPictures, useStickerUpload } from '@/hooks/useStickerUpload';
+import { useAddPictures, useSlideshow, useStickerUpload } from '@/hooks/useStickerUpload';
 import { useSelectedElement } from '@/store/selectors';
 import { useEditorStore } from '@/store/useEditorStore';
 import type { CanvasElement, ElementType } from '@/types';
@@ -40,6 +42,8 @@ export function ElementsPanel() {
   const updateElement = useEditorStore((s) => s.updateElement);
   const addPictures = useAddPictures();
   const picturesRef = useRef<HTMLInputElement>(null);
+  const slideshowRef = useRef<HTMLInputElement>(null);
+  const addSlideshow = useSlideshow();
   const characterCount = useEditorStore((s) => s.elements.filter(isCharacter).length);
 
   /** Adds/removes character boxes to reach `count` and arranges them in a pyramid. */
@@ -88,6 +92,20 @@ export function ElementsPanel() {
         >
           Characters
         </Button>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <FrameButtons />
+        </div>
+        <Button
+          size="sm"
+          fullWidth
+          className="mt-2"
+          icon={<GalleryHorizontalEnd />}
+          title="Pictures that change over time, in the top area"
+          onClick={() => slideshowRef.current?.click()}
+        >
+          Slideshow
+        </Button>
+        <HiddenFileInput ref={slideshowRef} accept="image/*" multiple onFiles={addSlideshow} />
         <HiddenFileInput
           ref={inputRef}
           accept="image/*"

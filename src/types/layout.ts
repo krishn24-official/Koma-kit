@@ -34,11 +34,30 @@ export type SplitDirection = 'horizontal' | 'vertical';
  */
 export type LayoutNode =
   | { type: 'cell'; cell: number }
-  | { type: 'split'; direction: SplitDirection; children: LayoutNode[]; sizes: number[] };
+  | {
+      type: 'split';
+      direction: SplitDirection;
+      children: LayoutNode[];
+      sizes: number[];
+      /**
+       * Slant of each divider (one per boundary; missing = straight): how far its two
+       * ends move apart along the split, as a fraction of the split's length. A
+       * divider at position p runs from p − tilt/2 at its start to p + tilt/2 at its
+       * end, so slanted dividers make slanted (manga-style) panels.
+       */
+      tilts?: number[];
+    };
 
-/** A layout flattened for drawing: `cells[i]` is the rectangle of cell i. */
+/** Polygon corners as fractions of the inner canvas (or pixels, where noted). */
+export type Polygon = Array<[number, number]>;
+
+/**
+ * A layout flattened for drawing: `cells[i]` is the bounding rectangle of cell i, and
+ * `polygons[i]` its exact outline when slanted dividers cut it (null = the rectangle).
+ */
 export interface ResolvedLayout {
   cells: CellRect[];
+  polygons: Array<Polygon | null>;
 }
 
 export interface LayoutPreset {
@@ -58,4 +77,6 @@ export interface LayoutDivider {
   area: CellRect;
   /** Divider position along the split direction, in fractions of the inner canvas. */
   position: number;
+  /** Slant (see LayoutNode `tilts`); 0 = straight. */
+  tilt: number;
 }

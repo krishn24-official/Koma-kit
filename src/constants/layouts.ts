@@ -16,6 +16,10 @@ const preset = (id: string, name: string, build: () => LayoutNode): LayoutPreset
 
 const rows = (n: number) => split('vertical', boxes(n));
 const cols = (n: number) => split('horizontal', boxes(n));
+/** The same split with slanted dividers (one tilt per divider; see LayoutNode). */
+const tilted = (node: LayoutNode, tilts: number[]): LayoutNode =>
+  node.type === 'split' ? { ...node, tilts } : node;
+
 /** `rowCount` rows, each split into `colCount` boxes. */
 const grid = (colCount: number, rowCount: number) =>
   split(
@@ -44,6 +48,25 @@ export const LAYOUTS: LayoutPreset[] = [
   preset('grid-3x2', '3 × 2 grid', () => grid(3, 2)),
   preset('grid-3x3', '3 × 3 grid', () => grid(3, 3)),
   preset('grid-4x4', '4 × 4 grid', () => grid(4, 4)),
+  // Slanted, manga-style panels.
+  preset('slash-2', 'Diagonal split', () => tilted(cols(2), [0.4])),
+  preset('slash-rows-2', 'Diagonal rows', () => tilted(rows(2), [-0.3])),
+  preset('manga-3', 'Manga: big top, 2 bottom', () =>
+    tilted(split('vertical', [box(), tilted(cols(2), [0.25])], [0.55, 0.45]), [0.18]),
+  ),
+  preset('manga-4', 'Manga: 4 panels', () =>
+    tilted(split('vertical', [tilted(cols(2), [0.22]), tilted(cols(2), [-0.18])]), [-0.14]),
+  ),
+  preset('manga-collage', 'Manga collage', () =>
+    tilted(
+      split(
+        'horizontal',
+        [tilted(rows(3), [0.12, -0.1]), tilted(rows(3), [-0.12, 0.14]), box()],
+        [0.3, 0.3, 0.4],
+      ),
+      [0.1, -0.16],
+    ),
+  ),
 ];
 
 export const DEFAULT_LAYOUT_ID = 'grid-2x2';
