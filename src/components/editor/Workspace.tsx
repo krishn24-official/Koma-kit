@@ -4,6 +4,7 @@ import { useEditorStore } from '@/store/useEditorStore';
 import { useUiStore } from '@/store/useUiStore';
 import { cn } from '@/utils/cn';
 import { TemplateCanvas } from './TemplateCanvas';
+import { WelcomeCard } from './WelcomeCard';
 
 /** Area around the canvas. Files dropped here fill empty cells in order. */
 export function Workspace() {
@@ -49,6 +50,7 @@ export function Workspace() {
       onPointerDown={handlePointerDown}
     >
       <TemplateCanvas />
+      <WelcomeCard />
     </div>
   );
 }

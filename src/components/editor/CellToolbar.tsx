@@ -660,7 +660,7 @@ export function CellToolbar() {
   } else {
     content = (
       <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
-        <Hint>Tap a box to add an image or video · Drag white handles to resize</Hint>
+        <Hint>Tap a box to add a picture · Drag a line to resize, tap it to tilt</Hint>
         <div className="flex flex-wrap justify-center gap-2">
           <Button size="sm" icon={<Plus />} onClick={addLayer}>
             Add layer

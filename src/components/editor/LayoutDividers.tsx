@@ -1,5 +1,5 @@
 import { useDrag } from '@use-gesture/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useEditorStore } from '@/store/useEditorStore';
 import type { LayoutDivider, Size } from '@/types';
 import { cn } from '@/utils/cn';
@@ -14,6 +14,9 @@ interface DividerHandleProps {
   divider: LayoutDivider;
   /** Inner canvas area in preview pixels (canvas minus outer border). */
   inner: { x: number; y: number; width: number; height: number };
+  /** The tilt grip only shows on the line last tapped (or under the mouse). */
+  active: boolean;
+  onActivate: () => void;
 }
 
 /** The divider's two ends in preview pixels (slanted dividers have ends apart). */
@@ -33,8 +36,9 @@ function dividerEnds(divider: LayoutDivider, inner: DividerHandleProps['inner'])
   };
 }
 
-function DividerHandle({ divider, inner }: DividerHandleProps) {
+function DividerHandle({ divider, inner, active, onActivate }: DividerHandleProps) {
   const [dragging, setDragging] = useState(false);
+  const [hovered, setHovered] = useState(false);
   const horizontal = divider.direction === 'horizontal';
   const { area } = divider;
 
@@ -43,7 +47,10 @@ function DividerHandle({ divider, inner }: DividerHandleProps) {
 
   const bindMove = useDrag(
     ({ delta: [dx, dy], first, last }) => {
-      if (first) setDragging(true);
+      if (first) {
+        setDragging(true);
+        onActivate();
+      }
       if (last) setDragging(false);
       const moved = horizontal ? dx : dy;
       if (moved === 0 || splitLength <= 0) return;
@@ -82,10 +89,17 @@ function DividerHandle({ divider, inner }: DividerHandleProps) {
     y: start.y + (end.y - start.y) * TILT_GRIP_AT,
   };
 
+  const hover = {
+    onPointerEnter: (e: { pointerType: string }) => e.pointerType === 'mouse' && setHovered(true),
+    onPointerLeave: () => setHovered(false),
+  };
+
   return (
     <>
       <div
         {...bindMove()}
+        {...hover}
+        data-divider
         role="separator"
         aria-orientation={horizontal ? 'vertical' : 'horizontal'}
         aria-label="Drag to resize boxes"
@@ -109,20 +123,24 @@ function DividerHandle({ divider, inner }: DividerHandleProps) {
           )}
         />
       </div>
-      <div
-        {...bindTilt()}
-        role="slider"
-        aria-label="Drag to tilt this line"
-        aria-valuenow={Math.round(divider.tilt * 100)}
-        title="Drag to tilt"
-        className={cn(
-          'absolute flex size-7 touch-none items-center justify-center',
-          horizontal ? 'cursor-ew-resize' : 'cursor-ns-resize',
-        )}
-        style={{ left: grip.x - 14, top: grip.y - 14, zIndex: zIndex + 1 }}
-      >
-        <span className="size-3 rounded-full border-2 border-white bg-brand-500 shadow-[0_0_0_1px_rgba(0,0,0,0.5)]" />
-      </div>
+      {(active || hovered) && (
+        <div
+          {...bindTilt()}
+          {...hover}
+          data-divider
+          role="slider"
+          aria-label="Drag to tilt this line"
+          aria-valuenow={Math.round(divider.tilt * 100)}
+          title="Drag to tilt"
+          className={cn(
+            'absolute flex size-7 touch-none items-center justify-center',
+            horizontal ? 'cursor-ew-resize' : 'cursor-ns-resize',
+          )}
+          style={{ left: grip.x - 14, top: grip.y - 14, zIndex: zIndex + 1 }}
+        >
+          <span className="size-3 rounded-full border-2 border-white bg-brand-500 shadow-[0_0_0_1px_rgba(0,0,0,0.5)]" />
+        </div>
+      )}
     </>
   );
 }
@@ -136,6 +154,7 @@ interface LayoutDividersProps {
 /** Draggable grips on every line between boxes. Editor only; not part of the export. */
 export function LayoutDividers({ canvasSize, padding }: LayoutDividersProps) {
   const layoutRoot = useEditorStore((s) => s.layoutRoot);
+  const [activeKey, setActiveKey] = useState<string | null>(null);
   const inner = {
     x: padding,
     y: padding,
@@ -143,15 +162,30 @@ export function LayoutDividers({ canvasSize, padding }: LayoutDividersProps) {
     height: Math.max(0, canvasSize.height - padding * 2),
   };
 
+  // Tapping anywhere else hides the tilt grip again.
+  useEffect(() => {
+    if (activeKey === null) return;
+    const onDown = (e: PointerEvent) => {
+      if (!(e.target as Element | null)?.closest?.('[data-divider]')) setActiveKey(null);
+    };
+    window.addEventListener('pointerdown', onDown);
+    return () => window.removeEventListener('pointerdown', onDown);
+  }, [activeKey]);
+
   return (
     <>
-      {getDividers(layoutRoot).map((divider) => (
-        <DividerHandle
-          key={`${divider.path.join('.')}-${divider.boundary}`}
-          divider={divider}
-          inner={inner}
-        />
-      ))}
+      {getDividers(layoutRoot).map((divider) => {
+        const key = `${divider.path.join('.')}-${divider.boundary}`;
+        return (
+          <DividerHandle
+            key={key}
+            divider={divider}
+            inner={inner}
+            active={activeKey === key}
+            onActivate={() => setActiveKey(key)}
+          />
+        );
+      })}
     </>
   );
 }
